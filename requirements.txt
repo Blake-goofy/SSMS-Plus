@@ -1,0 +1,6 @@
+watchdog
+pywin32
+pystray
+configparser
+pystray
+Pillow
