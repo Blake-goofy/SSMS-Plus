@@ -17,7 +17,7 @@ class Settings:
         if not os.path.exists(self.config_path):
             os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
             with open(self.config_path, "w") as f:
-                f.write("[Folders]\nTempDir = C:/Temp\nDestRoot = C:/Save\n")
+                f.write("[Folders]\nTempDir = C:\Temp\nDestRoot = C:\Save\n")
         self.config.read(self.config_path)
 
     def get(self, section, option, fallback=None):
@@ -31,3 +31,13 @@ class Settings:
     def save(self):
         with open(self.config_path, "w") as f:
             self.config.write(f)
+            
+    def get_temp_dir(self):
+        return self.get("Folders", "TempDir", fallback="C:\Temp")
+
+    def set_temp_dir(self, value):
+        self.set("Folders", "TempDir", value)
+        self.save()
+
+    def get_save_dir(self):
+        return self.get("Folders","SaveDir", fallback="C:\Save")
