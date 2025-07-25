@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 
 DARK_BG = "#222831"
 DARK_FG = "#eeeeee"
@@ -19,6 +19,11 @@ class SettingsWindow:
         self.temp_dir_var = tk.StringVar(value=current_temp)
         self.save_dir_var = tk.StringVar(value=current_save)
 
+        # Info/Error label at the top
+        self.info_var = tk.StringVar(value="Save settings below")
+        self.info_label = tk.Label(self.root, textvariable=self.info_var, bg=DARK_BG, fg="#FFD700", font=("Arial", 10, "bold"))
+        self.info_label.grid(row=0, column=0, columnspan=3, sticky="we", padx=10, pady=(10, 0))
+
         def on_hover(e):
             e.widget.configure(bg=BTN_HOVER)
 
@@ -29,25 +34,25 @@ class SettingsWindow:
                 e.widget.configure(bg=BTN_BG)
 
         # Temp Directory
-        tk.Label(self.root, text="Temp Directory:", bg=DARK_BG, fg=DARK_FG).grid(row=0, column=0, sticky="w", padx=10, pady=10)
-        tk.Entry(self.root, textvariable=self.temp_dir_var, bg=ENTRY_BG, fg=DARK_FG, relief='flat', width=40).grid(row=0, column=1, padx=10, pady=10)
+        tk.Label(self.root, text="Temp Directory:", bg=DARK_BG, fg=DARK_FG).grid(row=1, column=0, sticky="w", padx=10, pady=10)
+        tk.Entry(self.root, textvariable=self.temp_dir_var, bg=ENTRY_BG, fg=DARK_FG, relief='flat', width=40).grid(row=1, column=1, padx=10, pady=10)
         btn_browse_temp = tk.Button(self.root, text="Browse", command=self.browse_temp, bg=BTN_BG, fg=BTN_FG, relief='flat')
-        btn_browse_temp.grid(row=0, column=2, padx=5, pady=10)
+        btn_browse_temp.grid(row=1, column=2, padx=5, pady=10)
         btn_browse_temp.bind("<Enter>", on_hover)
         btn_browse_temp.bind("<Leave>", on_leave)
 
         # Save Directory
-        tk.Label(self.root, text="Save Directory:", bg=DARK_BG, fg=DARK_FG).grid(row=1, column=0, sticky="w", padx=10, pady=10)
-        tk.Entry(self.root, textvariable=self.save_dir_var, bg=ENTRY_BG, fg=DARK_FG, relief='flat', width=40).grid(row=1, column=1, padx=10, pady=10)
+        tk.Label(self.root, text="Save Directory:", bg=DARK_BG, fg=DARK_FG).grid(row=2, column=0, sticky="w", padx=10, pady=10)
+        tk.Entry(self.root, textvariable=self.save_dir_var, bg=ENTRY_BG, fg=DARK_FG, relief='flat', width=40).grid(row=2, column=1, padx=10, pady=10)
         btn_browse_save = tk.Button(self.root, text="Browse", command=self.browse_save, bg=BTN_BG, fg=BTN_FG, relief='flat')
-        btn_browse_save.grid(row=1, column=2, padx=5, pady=10)
+        btn_browse_save.grid(row=2, column=2, padx=5, pady=10)
         btn_browse_save.bind("<Enter>", on_hover)
         btn_browse_save.bind("<Leave>", on_leave)
 
 
         # Buttons
         btn_frame = tk.Frame(self.root, bg=DARK_BG)
-        btn_frame.grid(row=2, column=0, columnspan=3, pady=15)
+        btn_frame.grid(row=3, column=0, columnspan=3, pady=15)
         btn_save = tk.Button(btn_frame, text="Save", command=self.save, bg=BTN_BG, fg=BTN_FG, relief='flat', width=10)
         btn_save.pack(side="left", padx=10)
         btn_save.bind("<Enter>", on_hover)
@@ -73,20 +78,23 @@ class SettingsWindow:
         if directory:
             self.save_dir_var.set(directory)
 
+    def flash_info_label(self, final_fg):
+        # Flash the info label to white, then to the final color
+        def do_flash():
+            self.info_label.config(fg="#FFFFFF")
+            self.root.after(300, lambda: self.info_label.config(fg=final_fg))
+        self.root.after(0, do_flash)
+
     def save(self):
         temp = self.temp_dir_var.get().strip()
         save = self.save_dir_var.get().strip()
         if not temp or not save:
-            messagebox.showerror("Error", "Both directories are required.")
+            self.info_var.set("Both directories are required.")
+            self.flash_info_label("#FF5555")  # Red for error
             return
         self.on_save(temp, save)
-        self.root.destroy()
+        self.info_var.set("Settings saved successfully.")
+        self.flash_info_label("#00FF99")  # Green for success
 
     def show(self):
         self.root.mainloop()
-
-# Example usage:
-if __name__ == "__main__":
-    def on_save(temp, save):
-        print("Saving settings:", temp, save)
-    SettingsWindow("C:/Temp", "C:/Save", on_save).show()
