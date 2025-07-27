@@ -7,19 +7,17 @@ import pystray
 from PIL import Image
 
 class TrayApp:
-    def __init__(self, on_exit=None, on_settings=None, on_save_colors=None):
+    def __init__(self, on_exit=None, on_settings=None):
         self.icon = None
         self.on_exit = on_exit
         self.on_settings = on_settings
-        self.on_save_colors = on_save_colors
         self.running = True
 
     def run(self):
-        icon_path = os.path.join(os.path.dirname(sys.argv[0]), 'ssms.ico')
+        icon_path = os.path.join(os.path.dirname(sys.argv[0]), 'ssmsplus.ico')
         try:
             image = Image.open(icon_path)
         except Exception as e:
-            print(f"Could not load icon: {e}")
             # fallback to blank image
             image = Image.new('RGB', (64, 64), color='white')
 
@@ -36,8 +34,6 @@ class TrayApp:
     def show_settings(self):
         if self.on_settings:
             self.on_settings()
-        else:
-            print("Settings selected.")
 
     def exit_app(self):
         self.running = False

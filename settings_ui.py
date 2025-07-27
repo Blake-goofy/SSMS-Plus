@@ -3,15 +3,9 @@ import threading
 from tkinter import filedialog
 from pathlib import Path
 import webbrowser
-from watcher import start_watching
-from watcher import on_new_sql
-from settings import Settings
-from state import State
 from regex_writer import regenerate_all_regex_patterns
+from state import settings
 import os
-
-settings = Settings()
-state = State(settings=settings)
 
 DARK_BG = "#222831"
 DARK_FG = "#eeeeee"
@@ -40,8 +34,8 @@ class SettingsWindow:
         else:
             self.info_var = tk.StringVar(value="Save settings below")
             self.info_label = tk.Label(self.root, textvariable=self.info_var, bg=DARK_BG, fg="#FFD700", font=("Arial", 10, "bold"))
-        self.info_label.grid(row=0, column=0, columnspan=3, sticky="we", padx=10, pady=(10, 0))
-
+        self.info_label.grid(row=0, column=0, columnspan=2, sticky="we", padx=10, pady=(10, 0))
+        
         def on_hover(e):
             e.widget.configure(bg=BTN_HOVER)
 
@@ -50,6 +44,12 @@ class SettingsWindow:
                 e.widget.configure(bg=ENTRY_BG)
             else:
                 e.widget.configure(bg=BTN_BG)
+
+        # Help button in top right corner
+        btn_help = tk.Button(self.root, text="Help", command=self.open_help, bg=ENTRY_BG, fg=DARK_FG, relief='flat', width=8)
+        btn_help.grid(row=0, column=2, padx=10, pady=(10, 0), sticky="e")
+        btn_help.bind("<Enter>", on_hover)
+        btn_help.bind("<Leave>", lambda e: on_leave(e, "Close"))
 
         # Temp Directory
         tk.Label(self.root, text="Temp Directory:", bg=DARK_BG, fg=DARK_FG).grid(row=1, column=0, sticky="w", padx=10, pady=10)
@@ -88,11 +88,6 @@ class SettingsWindow:
         # Buttons
         btn_frame = tk.Frame(self.root, bg=DARK_BG)
         btn_frame.grid(row=4, column=0, columnspan=3, pady=15)
-        
-        btn_help = tk.Button(btn_frame, text="Help", command=self.open_help, bg=ENTRY_BG, fg=DARK_FG, relief='flat', width=8)
-        btn_help.pack(side="left", padx=10)
-        btn_help.bind("<Enter>", on_hover)
-        btn_help.bind("<Leave>", lambda e: on_leave(e, "Close"))
         
         btn_save = tk.Button(btn_frame, text="Save", command=self.save, bg=BTN_BG, fg=BTN_FG, relief='flat', width=10)
         btn_save.pack(side="left", padx=10)
@@ -172,19 +167,11 @@ class SettingsWindow:
         
         # If mode changed, regenerate regex patterns
         if mode_changed:
-            print(f"Grouping mode changed from '{old_mode}' to '{grouping_mode}' - regenerating regex patterns...")
             regenerate_all_regex_patterns()
         
         self.on_save(temp, save)
         self.info_var.set("Settings saved successfully.")
-        self.flash_info_label("#00FF99")  # Green for success  
-
-        def start_watcher_in_thread(temp_dir):
-            watcher_thread = threading.Thread(target=start_watching, args=(temp_dir, on_new_sql), daemon=True)
-            watcher_thread.start()
-            return watcher_thread
-        
-        start_watcher_in_thread(temp)
+        self.flash_info_label("#00FF99")  # Green for success
 
     def show(self):
         self.root.mainloop()

@@ -1,12 +1,9 @@
 """Handles file moving, renaming, and opening in SSMS."""
 
 import os
-from state import State
+import time
 from pathlib import Path
-from settings import Settings
-
-settings = Settings()
-state = State(settings=settings)
+from state import state
 
 class FileManager:
     def __init__(self):
@@ -16,16 +13,35 @@ class FileManager:
     def create_save_dir(path):
         if not os.path.exists(path):
             os.makedirs(path)
-            print(f"Created save directory: {path}")
-        else:
-            print(f"Save directory already exists: {path}")
 
     @staticmethod
-    def delete_temp_files():
-        """Delete all but the latest 3 files from each temp folder in the save directory structure"""            
+    def mark_session_start():
+        """Create a session marker file to track when this session started"""
+        try:
+            temp_dir = Path(state.temp_dir)
+            session_marker = temp_dir / ".ssmsplus_session"
+            
+            # Create session marker with current timestamp
+            with open(session_marker, 'w') as f:
+                f.write(str(time.time()))
+            
+            state.session_start_time = time.time()
+            print(f"[FileManager] Session started at {time.ctime(state.session_start_time)}")
+            
+        except Exception as e:
+            print(f"[FileManager] Error creating session marker: {e}")
+            state.session_start_time = time.time()  # Fallback to current time
+
+    @staticmethod
+    def cleanup_old_temp_files():
+        """Delete temp files from previous sessions at startup"""
+        if not hasattr(state, 'session_start_time'):
+            print("[FileManager] No session start time available, skipping cleanup")
+            return
+            
         save_dir = Path(state.save_dir)
         if not save_dir.exists():
-            print(f"Save directory does not exist: {save_dir}")
+            print(f"[FileManager] Save directory does not exist: {save_dir}")
             return
             
         try:
@@ -33,10 +49,10 @@ class FileManager:
             temp_folders = list(save_dir.rglob("temp"))
             
             if not temp_folders:
-                print("No temp folders found in save directory structure.")
+                print("[FileManager] No temp folders found in save directory structure.")
                 return
                 
-            print(f"Found {len(temp_folders)} temp folders to clean up...")
+            print(f"[FileManager] Found {len(temp_folders)} temp folders to check for old files...")
             
             total_deleted = 0
             for temp_folder in temp_folders:
@@ -47,33 +63,37 @@ class FileManager:
                     # Get all files in this temp folder
                     all_files = [f for f in temp_folder.iterdir() if f.is_file()]
                     
-                    if len(all_files) <= 3:
-                        print(f"{temp_folder}: Only {len(all_files)} files, keeping all.")
+                    if not all_files:
                         continue
                         
-                    # Sort by modification time (newest first)
-                    all_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+                    # Find files older than this session
+                    old_files = []
+                    for file_path in all_files:
+                        file_mtime = file_path.stat().st_mtime
+                        if file_mtime < state.session_start_time:
+                            old_files.append(file_path)
                     
-                    # Keep the latest 3, delete the rest
-                    files_to_delete = all_files[3:]
+                    if not old_files:
+                        print(f"[FileManager] {temp_folder}: No old files to delete")
+                        continue
+                        
+                    print(f"[FileManager] {temp_folder}: Deleting {len(old_files)} old files from previous sessions...")
                     
-                    print(f"{temp_folder}: Keeping latest 3 files, deleting {len(files_to_delete)} old files...")
-                    
-                    for file_path in files_to_delete:
+                    for file_path in old_files:
                         try:
                             file_path.unlink()
-                            print(f"  Deleted: {file_path.name}")
+                            print(f"[FileManager]   Deleted: {file_path.name}")
                             total_deleted += 1
                         except Exception as e:
-                            print(f"  Error deleting {file_path}: {e}")
+                            print(f"[FileManager]   Error deleting {file_path}: {e}")
                             
                 except Exception as e:
-                    print(f"Error processing temp folder {temp_folder}: {e}")
+                    print(f"[FileManager] Error processing temp folder {temp_folder}: {e}")
                     
-            print(f"Cleanup complete: {total_deleted} total files deleted from temp folders.")
+            print(f"[FileManager] Cleanup complete: {total_deleted} old temp files deleted.")
                     
         except Exception as e:
-            print(f"Error processing save directory {save_dir}: {e}")
+            print(f"[FileManager] Error during temp file cleanup: {e}")
 
     @staticmethod
     def get_ssms_temp():
@@ -81,7 +101,6 @@ class FileManager:
         config_files = list(temp_dir.rglob("ColorByRegexConfig.txt"))
 
         if not config_files:
-            print("No ColorByRegexConfig.txt found.")
             return
 
         # Find the parent folder with the most recent modification or creation time
@@ -94,7 +113,6 @@ class FileManager:
         latest_folder = latest_config.parent
 
         state.regex_path = str(latest_config)
-        print(f"Found config path: {state.regex_path}")
 
         # Find the color json file in the same folder
         color_jsons = list(latest_folder.glob("customized-groupid-color-*.json"))
@@ -102,6 +120,3 @@ class FileManager:
             # Pick the most recent one if multiple
             latest_json = max(color_jsons, key=lambda p: max(p.stat().st_mtime, p.stat().st_ctime))
             state.color_path = str(latest_json)
-            print(f"Found color path: {state.color_path}")
-        else:
-            print("No customized-groupid-color-*.json found in latest folder.")

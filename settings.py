@@ -64,7 +64,6 @@ class Settings:
             self.set_setting("ServerDB", "ServerCombinations", ",".join(server_combinations))
             
         self.save()
-        print(f"Tracked server/db combination: {server}.{db}")
     
     def get_server_db_combinations(self):
         """Get all tracked server+database combinations"""
@@ -98,7 +97,7 @@ class Settings:
         self.save()
     
     def get_regex_pattern(self, server, db):
-        """Generate regex pattern based on current grouping mode"""
+        """Generate regex pattern based on current grouping mode - returns single pattern for current combination"""
         mode = self.get_grouping_mode()
         if mode == 'server':
             # Group by server only - ignore the database parameter
@@ -106,3 +105,23 @@ class Settings:
         else:  # 'server_db'
             # Group by server and database
             return f"\\\\{server}\\\\{db}(?=\\\\|$)"
+    
+    def get_all_regex_patterns(self):
+        """Generate all regex patterns for all tracked combinations"""
+        mode = self.get_grouping_mode()
+        patterns = []
+        
+        if mode == 'server':
+            # Group by server only - get all tracked servers
+            servers = self.get_server_combinations()
+            for server in servers:
+                patterns.append(f"\\\\{server}\\\\.*(?=\\\\|$)")
+        else:  # 'server_db'
+            # Group by server and database - get all tracked server.db combinations
+            combinations = self.get_server_db_combinations()
+            for combo in combinations:
+                if '.' in combo:
+                    combo_server, combo_db = combo.split('.', 1)
+                    patterns.append(f"\\\\{combo_server}\\\\{combo_db}(?=\\\\|$)")
+        
+        return patterns
