@@ -56,12 +56,12 @@ TEST-SQL01\TestDB (Purple)
 
 Just use SSMS normally! SSMS Plus runs in the background and automatically:
 - Organizes new SQL files into server/database folders
-- Colors tabs based on your grouping preference
-- **Left-click** tray icon for settings
-- **Right-click** tray icon to exit
+- Updates ssms regex file based on your grouping preference
 
 ## Troubleshooting
 
 **Colors not working?** Check that "Color tabs by regular expression" is enabled in SSMS Options.
+
+**Colors not saving?** SSMS does not save tab colors between sessions, so if you close SSMS, tab colors will be lost.
 
 **Files not saving?** Verify temp directory matches where SSMS creates files (right-click any SSMS tab → "Open Containing Folder").
