@@ -1,11 +1,12 @@
 """Handles file moving, renaming, and opening in SSMS."""
 
 import os
-import configparser
-import json
-import re
 from state import State
 from pathlib import Path
+from settings import Settings
+
+settings = Settings()
+state = State(settings=settings)
 
 class FileManager:
     def __init__(self):
@@ -21,12 +22,8 @@ class FileManager:
 
     @staticmethod
     def delete_temp_files():
-        """Delete all but the latest 3 files from each temp folder in the save directory structure"""
-        if not hasattr(State, 'save_dir') or not State.save_dir:
-            print("No save directory configured.")
-            return
-            
-        save_dir = Path(State.save_dir)
+        """Delete all but the latest 3 files from each temp folder in the save directory structure"""            
+        save_dir = Path(state.save_dir)
         if not save_dir.exists():
             print(f"Save directory does not exist: {save_dir}")
             return
@@ -80,7 +77,7 @@ class FileManager:
 
     @staticmethod
     def get_ssms_temp():
-        temp_dir = State.temp_dir
+        temp_dir = state.temp_dir
         config_files = list(temp_dir.rglob("ColorByRegexConfig.txt"))
 
         if not config_files:
@@ -96,15 +93,15 @@ class FileManager:
         latest_config = max(config_files, key=folder_time)
         latest_folder = latest_config.parent
 
-        State.regex_path = str(latest_config)
-        print(f"Found config path: {State.regex_path}")
+        state.regex_path = str(latest_config)
+        print(f"Found config path: {state.regex_path}")
 
         # Find the color json file in the same folder
         color_jsons = list(latest_folder.glob("customized-groupid-color-*.json"))
         if color_jsons:
             # Pick the most recent one if multiple
             latest_json = max(color_jsons, key=lambda p: max(p.stat().st_mtime, p.stat().st_ctime))
-            State.color_path = str(latest_json)
-            print(f"Found color path: {State.color_path}")
+            state.color_path = str(latest_json)
+            print(f"Found color path: {state.color_path}")
         else:
             print("No customized-groupid-color-*.json found in latest folder.")

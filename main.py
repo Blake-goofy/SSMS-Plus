@@ -8,55 +8,12 @@ import threading
 from watcher import on_new_sql
 from file_manager import FileManager
 import os
-import sys
-import tempfile
-import atexit
 
 settings = Settings()
 state = State(settings=settings)
 
-# Single instance check
-LOCK_FILE = os.path.join(tempfile.gettempdir(), "ssmsplus.lock")
-
-def is_already_running():
-    """Check if another instance is already running"""
-    if os.path.exists(LOCK_FILE):
-        try:
-            # Try to read the PID from the lock file
-            with open(LOCK_FILE, 'r') as f:
-                pid = int(f.read().strip())
-            
-            # Check if the process is still running (Windows)
-            import subprocess
-            result = subprocess.run(['tasklist', '/FI', f'PID eq {pid}'], 
-                                  capture_output=True, text=True, shell=True)
-            if str(pid) in result.stdout:
-                return True
-            else:
-                # Process no longer exists, remove stale lock file
-                os.remove(LOCK_FILE)
-                return False
-        except (ValueError, FileNotFoundError, subprocess.SubprocessError):
-            # If we can't check properly, assume not running and remove lock
-            try:
-                os.remove(LOCK_FILE)
-            except:
-                pass
-            return False
-    return False
-
-def create_lock_file():
-    """Create a lock file with current process ID"""
-    with open(LOCK_FILE, 'w') as f:
-        f.write(str(os.getpid()))
-
-def cleanup_lock_file():
-    """Remove the lock file on exit"""
-    try:
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
-    except:
-        pass
+# Global variable to track the current settings window
+current_settings_window = None
 
 def start_watcher_in_thread(temp_dir):
     watcher_thread = threading.Thread(target=start_watching, args=(temp_dir, on_new_sql), daemon=True)
@@ -64,16 +21,39 @@ def start_watcher_in_thread(temp_dir):
     return watcher_thread
 
 def on_settings():
+    global current_settings_window
+    
+    # If a settings window is already open, bring it to focus
+    if current_settings_window and current_settings_window.root.winfo_exists():
+        try:
+            current_settings_window.root.lift()
+            current_settings_window.root.focus_force()
+            current_settings_window.root.attributes('-topmost', True)
+            current_settings_window.root.after_idle(current_settings_window.root.attributes, '-topmost', False)
+            return
+        except:
+            # Window no longer exists, create a new one
+            current_settings_window = None
+    
     temp_dir = state.temp_dir
     save_dir = state.save_dir
+    
+    # Check if this is being called because directories don't exist
+    dirs_missing = not temp_dir or not save_dir or not os.path.isdir(temp_dir) or not os.path.isdir(save_dir)
+    initial_error = "Both directories must exist." if dirs_missing else None
 
     def on_save(new_temp, new_save):
-        settings.set("Folders", "TempDir", new_temp)
-        settings.set("Folders", "SaveDir", new_save)
-        settings.save()
+        settings.set_temp_dir(new_temp)
+        settings.set_save_dir(new_save)
         print("Settings updated:", new_temp, new_save)
 
-    threading.Thread(target=lambda: SettingsWindow(temp_dir, save_dir, on_save).show()).start()
+    def show_settings_window():
+        global current_settings_window
+        current_settings_window = SettingsWindow(temp_dir, save_dir, on_save, initial_error)
+        current_settings_window.show()
+        current_settings_window = None  # Clear reference when window closes
+
+    threading.Thread(target=show_settings_window).start()
 
 def on_exit():
     print("Exiting app.")
@@ -82,17 +62,6 @@ def on_save_colors():
     FileManager.save_colors()
 
 if __name__ == '__main__':
-    # Check if another instance is already running
-    if is_already_running():
-        print("SSMS Plus is already running! Only one instance can run at a time.")
-        print("If you believe this is an error, delete the lock file at:", LOCK_FILE)
-        input("Press Enter to exit...")
-        sys.exit(1)
-    
-    # Create lock file and register cleanup
-    create_lock_file()
-    atexit.register(cleanup_lock_file)
-    
     # if temp_dir or save_dir isn't a real directory, open the settings window
     if not state.temp_dir or not state.save_dir or not os.path.isdir(state.temp_dir) or not os.path.isdir(state.save_dir):
         on_settings()

@@ -23,11 +23,13 @@ class TrayApp:
             # fallback to blank image
             image = Image.new('RGB', (64, 64), color='white')
 
+        # Create menu - add a separator and make the first item the default
         menu = pystray.Menu(
-            pystray.MenuItem('Settings', self.show_settings),
-            pystray.MenuItem('Save Colors', self.save_colors),
+            pystray.MenuItem('Open Settings', self.show_settings, default=True),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem('Exit', self.exit_app)
         )
+        
         self.icon = pystray.Icon("SSMS Plus", image, "SSMS Plus", menu)
         self.icon.run()
 
@@ -36,12 +38,6 @@ class TrayApp:
             self.on_settings()
         else:
             print("Settings selected.")
-
-    def save_colors(self):
-        if self.on_save_colors:
-            self.on_save_colors()
-        else:
-            print("Save Colors selected.")
 
     def exit_app(self):
         self.running = False

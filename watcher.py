@@ -88,5 +88,3 @@ def on_new_sql(temp_file):
         return
     save_dir = state.save_dir
     SsmsWindow.save_temp_file_to_db_dir(temp_file, save_dir, server, db)
-    color_mappings_path = os.path.join(os.path.dirname(__file__), "config", "color_mappings.ini")
-    update_color_mappings_ini(color_mappings_path, server, db)

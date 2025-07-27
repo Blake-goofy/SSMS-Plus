@@ -1,165 +1,148 @@
 """Regex/color config updater for SSMS."""
-import os
-import json
-import re
-import configparser
 from pathlib import Path
+from state import State
+from settings import Settings
+
+settings = Settings()
+state = State(settings=settings)
 
 @staticmethod
 def write_server_db_to_regex_file(server, db):
     import time
     
-    # Retry logic for finding regex files
-    max_retries = 5
-    retry_delay = 0.5
-    all_regex_files = []
+    # Track this server/database combination in persistent settings
+    settings.add_server_db(server, db)
     
-    for attempt in range(max_retries):
-        temp_dir = Path(os.getenv("TEMP"))
-        config_files = list(temp_dir.rglob("ColorByRegexConfig.txt"))
-        
-        if config_files:
-            print(f"Found {len(config_files)} ColorByRegexConfig.txt files (attempt {attempt + 1}/{max_retries})")
-            all_regex_files = config_files
-            break
-        else:
-            print(f"No ColorByRegexConfig.txt found (attempt {attempt + 1}/{max_retries})")
-            
-        if attempt < max_retries - 1:  # Don't wait after the last attempt
-            print(f"Waiting {retry_delay} seconds before retry...")
-            time.sleep(retry_delay)
+    # Get the regex pattern based on current grouping mode from settings
+    regex_pattern = settings.get_regex_pattern(server, db)
     
-    if not all_regex_files:
-        print("Could not find any regex files after all retries.")
-        return
-
-    # Check if the server/db combination already exists in any file
-    regex_pattern = f"\\\\{server}\\\\{db}(?=\\\\|$)"
-    files_updated = 0
-    files_already_had_entry = 0
+    if State.first_run:
+        # Wait 2 seconds for SSMS to create config files, then process them once
+        State.first_run = False
+        print("Waiting 2 seconds for SSMS to create config files...")
+        time.sleep(2)
     
-    for regex_file_path in all_regex_files:
-        try:
-            # Check if this file already has the pattern
-            with open(regex_file_path, 'r', encoding="utf-8") as f:
-                existing_content = f.read()
-                
-            if regex_pattern in existing_content:
-                print(f"Regex for server: {server}, db: {db} already exists in {regex_file_path}")
-                files_already_had_entry += 1
-            else:
-                # Append the new regex to this file
-                with open(regex_file_path, 'a', encoding="utf-8") as f:
-                    f.write(f"{regex_pattern}\n")
-                print(f"Added regex for server: {server}, db: {db} to {regex_file_path}")
-                files_updated += 1
-                
-        except Exception as e:
-            print(f"Error processing {regex_file_path}: {e}")
-    
-    print(f"Summary: {files_updated} files updated, {files_already_had_entry} files already had the entry")
-
-@staticmethod
-def apply_colors_from_ini():
-    """
-    Load color mappings from color_mappings.ini and apply them to the SSMS color JSON files.
-    Maps regex entries to JSON group IDs by order (first regex -> first group, etc.)
-    """
-    import time
-    
-    # Find all SSMS temp directories with both regex and color files
-    temp_dir = Path(os.getenv("TEMP"))
+    temp_dir = Path(state.temp_dir)
     config_files = list(temp_dir.rglob("ColorByRegexConfig.txt"))
     
     if not config_files:
         print("No ColorByRegexConfig.txt files found.")
         return
-        
-    ini_path = Path(__file__).parent / "config/color_mappings.ini"
-    if not ini_path.exists():
-        print(f"INI file not found: {ini_path}")
-        return
-        
-    # Load color mappings from INI
-    config = configparser.ConfigParser()
-    config.read(ini_path)
-    color_map = {}  # (server, db) -> color_index
-    for section in config.sections():
-        for db, color_index in config.items(section):
-            color_map[(section.upper(), db.upper())] = int(color_index)
     
-    print(f"Loaded {len(color_map)} color mappings from INI file")
+    print(f"Found {len(config_files)} ColorByRegexConfig.txt files")
+    processed_files = 0
     
-    total_updated = 0
     for regex_file_path in config_files:
         try:
-            # Find corresponding color JSON file in same directory
-            parent_dir = regex_file_path.parent
-            color_jsons = list(parent_dir.glob("customized-groupid-color-*.json"))
-            
-            if not color_jsons:
-                print(f"No color JSON file found in {parent_dir}")
-                continue
-                
-            # Use the most recent color JSON file
-            color_json_path = max(color_jsons, key=lambda p: p.stat().st_mtime)
-            
-            # Parse regex file to get ordered list of (server, db)
-            regex_line_re = re.compile(r"\\\\([^\\]+)\\\\([^\\(]+)(?=\\\\|\\$)")
-            regex_entries = []
-            
+            # Read existing content
             with open(regex_file_path, 'r', encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith('//') or not line:
-                        continue  # Skip comments and empty lines
-                    match = regex_line_re.search(line)
-                    if match:
-                        server, db = match.group(1).upper(), match.group(2).upper()
-                        regex_entries.append((server, db))
+                existing_lines = f.readlines()
             
-            if not regex_entries:
-                print(f"No server/database regex entries found in {regex_file_path}")
-                continue
-                
-            # Load color JSON
-            with open(color_json_path, 'r', encoding="utf-8") as f:
-                color_json = json.load(f)
-                
-            color_map_json = color_json.get("ColorMap", {})
-            group_ids = list(color_map_json.keys())
+            # Check if this file already has the pattern
+            pattern_exists = any(regex_pattern.strip() in line.strip() for line in existing_lines)
             
-            # Map regex entries to group IDs by order
-            updated = False
-            for i, (server, db) in enumerate(regex_entries):
-                if i >= len(group_ids):
-                    print(f"Warning: More regex entries than JSON groups in {color_json_path}")
-                    break
-                    
-                group_id = group_ids[i]
-                color_index = color_map.get((server, db))
-                
-                if color_index is not None:
-                    current_color = color_map_json[group_id]["ColorIndex"]
-                    if current_color != color_index:
-                        color_map_json[group_id]["ColorIndex"] = color_index
-                        updated = True
-                        print(f"  Updated {server}.{db}: color {current_color} -> {color_index}")
-                    else:
-                        print(f"  {server}.{db}: color already set to {color_index}")
-                else:
-                    print(f"  {server}.{db}: no color mapping found in INI")
-            
-            # Save JSON if updated
-            if updated:
-                with open(color_json_path, 'w', encoding="utf-8") as f:
-                    json.dump(color_json, f, indent=2)
-                print(f"Updated colors in {color_json_path}")
-                total_updated += 1
+            if pattern_exists:
+                print(f"Regex for server: {server}, db: {db} already exists in {regex_file_path}")
             else:
-                print(f"No color changes needed for {color_json_path}")
+                # Filter out old server patterns first, then add the new one
+                filtered_lines = []
+                old_patterns_removed = 0
+                
+                for line in existing_lines:
+                    line_stripped = line.strip()
+                    # Check if this line looks like one of our server patterns
+                    is_server_pattern = (
+                        line_stripped.startswith('\\\\') and 
+                        (line_stripped.endswith('(?=\\|$)') or line_stripped.endswith('(?=\\\\|$)'))
+                    )
+                    
+                    if not is_server_pattern:
+                        filtered_lines.append(line)
+                    else:
+                        old_patterns_removed += 1
+                
+                # Write back filtered content plus new pattern
+                with open(regex_file_path, 'w', encoding="utf-8") as f:
+                    f.writelines(filtered_lines)
+                    f.write(f"{regex_pattern}\n")
+                
+                if old_patterns_removed > 0:
+                    print(f"Updated {regex_file_path}: removed {old_patterns_removed} old patterns, added 1 new pattern (mode: {settings.get_grouping_mode()})")
+                else:
+                    print(f"Added regex for server: {server}, db: {db} to {regex_file_path} (mode: {settings.get_grouping_mode()})")
+            
+            processed_files += 1
+            
+        except Exception as e:
+            print(f"Error processing {regex_file_path}: {e}")
+    
+    print(f"Processing complete: {processed_files} files processed")
+
+@staticmethod
+def regenerate_all_regex_patterns():
+    """Regenerate all regex patterns based on current grouping mode and tracked combinations"""
+    
+    # Reload settings to get the latest values
+    settings.load()
+    
+    # Get mode and check if we have any tracked combinations
+    mode = settings.get_grouping_mode()
+    if mode == 'server':
+        tracked_combinations = settings.get_server_combinations()
+        combination_type = "server"
+    else:  # 'server_db'
+        tracked_combinations = settings.get_server_db_combinations()
+        combination_type = "server+database"
+        
+    if not tracked_combinations:
+        print(f"No {combination_type} combinations tracked yet.")
+        return
+    
+    print(f"Regenerating regex patterns for {len(tracked_combinations)} {combination_type} combinations in mode: {mode}")
+    
+    temp_dir = Path(state.temp_dir)
+    config_files = list(temp_dir.rglob("ColorByRegexConfig.txt"))
+    
+    if not config_files:
+        print("No ColorByRegexConfig.txt files found.")
+        return
+
+    print(f"Found {len(config_files)} ColorByRegexConfig.txt files")
+
+    # Generate new patterns based on current mode
+    pattern_list = []
+    
+    if mode == 'server':
+        # In server mode, get unique server names and create one pattern per server
+        server_combinations = settings.get_server_combinations()
+        for server in server_combinations:
+            pattern = f"\\\\{server}\\\\.*(?=\\\\|$)"
+            if pattern not in pattern_list:
+                pattern_list.append(pattern)
+    else:  # 'server_db'
+        # In server_db mode, get server.db combinations and create one pattern per combination
+        server_db_combinations = settings.get_server_db_combinations()
+        for combination in server_db_combinations:
+            server, db = combination.split('.', 1)  # Split on first dot only
+            pattern = f"\\\\{server}\\\\{db}(?=\\\\|$)"
+            if pattern not in pattern_list:
+                pattern_list.append(pattern)
+    
+    print(f"Generated {len(pattern_list)} unique patterns for current mode")
+    
+    # Update each regex file - start fresh and add only our patterns
+    files_updated = 0
+    for regex_file_path in config_files:
+        try:
+            # Start with a completely fresh file - write only our patterns
+            with open(regex_file_path, 'w', encoding="utf-8") as f:
+                for pattern in sorted(pattern_list):  # Sort for consistent ordering
+                    f.write(f"{pattern}\n")
+            
+            print(f"Updated {regex_file_path}: wrote {len(pattern_list)} fresh patterns (mode: {mode})")
+            files_updated += 1
                 
         except Exception as e:
             print(f"Error processing {regex_file_path}: {e}")
     
-    print(f"Color update complete: {total_updated} JSON files updated")
+    print(f"Regeneration complete: {files_updated} files updated with new grouping mode")

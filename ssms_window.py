@@ -8,7 +8,6 @@ import time
 from file_manager import FileManager
 from regex_writer import write_server_db_to_regex_file
 
-
 class SsmsWindow:
     
     def save_temp_file_to_db_dir(temp_file, save_dir, server, db):
