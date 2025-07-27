@@ -2,7 +2,7 @@
 import configparser
 import os
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config", "settings.ini")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "settings.ini")
 
 class Settings:
     def __init__(self, config_path=CONFIG_PATH):
@@ -13,7 +13,6 @@ class Settings:
     def load(self):
         # Create config file if missing
         if not os.path.exists(self.config_path):
-            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
             with open(self.config_path, "w") as f:
                 f.write("[Folders]\n")
         self.config.read(self.config_path)
