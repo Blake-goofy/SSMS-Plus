@@ -1,5 +1,14 @@
 import tkinter as tk
+import threading
 from tkinter import filedialog
+from watcher import start_watching
+from watcher import on_new_sql
+from settings import Settings
+from state import State
+import os
+
+settings = Settings()
+state = State(settings=settings)
 
 DARK_BG = "#222831"
 DARK_FG = "#eeeeee"
@@ -71,12 +80,16 @@ class SettingsWindow:
     def browse_temp(self):
         directory = filedialog.askdirectory(initialdir=self.temp_dir_var.get() or ".")
         if directory:
-            self.temp_dir_var.set(directory)
+            # Convert forward slashes to backslashes for Windows
+            normalized_directory = directory.replace('/', '\\')
+            self.temp_dir_var.set(normalized_directory)
 
     def browse_save(self):
         directory = filedialog.askdirectory(initialdir=self.save_dir_var.get() or ".")
         if directory:
-            self.save_dir_var.set(directory)
+            # Convert forward slashes to backslashes for Windows
+            normalized_directory = directory.replace('/', '\\')
+            self.save_dir_var.set(normalized_directory)
 
     def flash_info_label(self, final_fg):
         # Flash the info label to white, then to the final color
@@ -88,13 +101,20 @@ class SettingsWindow:
     def save(self):
         temp = self.temp_dir_var.get().strip()
         save = self.save_dir_var.get().strip()
-        if not temp or not save:
+        if not temp or not save or not os.path.isdir(temp) or not os.path.isdir(save):
             self.info_var.set("Both directories are required.")
             self.flash_info_label("#FF5555")  # Red for error
             return
         self.on_save(temp, save)
         self.info_var.set("Settings saved successfully.")
-        self.flash_info_label("#00FF99")  # Green for success
+        self.flash_info_label("#00FF99")  # Green for success  
+
+        def start_watcher_in_thread(temp_dir):
+            watcher_thread = threading.Thread(target=start_watching, args=(temp_dir, on_new_sql), daemon=True)
+            watcher_thread.start()
+            return watcher_thread
+        
+        start_watcher_in_thread(temp)
 
     def show(self):
         self.root.mainloop()

@@ -29,9 +29,6 @@ class Settings:
     def save(self):
         with open(self.config_path, "w") as f:
             self.config.write(f)
-            
-    def get_temp_dir(self):
-        return self.get("Folders", "TempDir", fallback=r"C:\Temp")
 
     def set_temp_dir(self, value):
         self.set("Folders", "TempDir", value)

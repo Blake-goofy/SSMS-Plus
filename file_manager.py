@@ -1,7 +1,6 @@
 """Handles file moving, renaming, and opening in SSMS."""
 
 import os
-import shutil
 import configparser
 import json
 import re
@@ -12,20 +11,76 @@ class FileManager:
     def __init__(self):
         pass
 
-    def delete_temp_dirs(self, *dirs):
-        for dir_path in dirs:
-            if os.path.exists(dir_path):
+    @staticmethod
+    def create_save_dir(path):
+        if not os.path.exists(path):
+            os.makedirs(path)
+            print(f"Created save directory: {path}")
+        else:
+            print(f"Save directory already exists: {path}")
+
+    @staticmethod
+    def delete_temp_files():
+        """Delete all but the latest 3 files from each temp folder in the save directory structure"""
+        if not hasattr(State, 'save_dir') or not State.save_dir:
+            print("No save directory configured.")
+            return
+            
+        save_dir = Path(State.save_dir)
+        if not save_dir.exists():
+            print(f"Save directory does not exist: {save_dir}")
+            return
+            
+        try:
+            # Find all 'temp' folders in the save directory structure
+            temp_folders = list(save_dir.rglob("temp"))
+            
+            if not temp_folders:
+                print("No temp folders found in save directory structure.")
+                return
+                
+            print(f"Found {len(temp_folders)} temp folders to clean up...")
+            
+            total_deleted = 0
+            for temp_folder in temp_folders:
+                if not temp_folder.is_dir():
+                    continue
+                    
                 try:
-                    shutil.rmtree(dir_path)
-                    print(f"Deleted: {dir_path}")
+                    # Get all files in this temp folder
+                    all_files = [f for f in temp_folder.iterdir() if f.is_file()]
+                    
+                    if len(all_files) <= 3:
+                        print(f"{temp_folder}: Only {len(all_files)} files, keeping all.")
+                        continue
+                        
+                    # Sort by modification time (newest first)
+                    all_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+                    
+                    # Keep the latest 3, delete the rest
+                    files_to_delete = all_files[3:]
+                    
+                    print(f"{temp_folder}: Keeping latest 3 files, deleting {len(files_to_delete)} old files...")
+                    
+                    for file_path in files_to_delete:
+                        try:
+                            file_path.unlink()
+                            print(f"  Deleted: {file_path.name}")
+                            total_deleted += 1
+                        except Exception as e:
+                            print(f"  Error deleting {file_path}: {e}")
+                            
                 except Exception as e:
-                    print(f"Error deleting {dir_path}: {e}")
-            else:
-                print(f"Directory not found: {dir_path}")
+                    print(f"Error processing temp folder {temp_folder}: {e}")
+                    
+            print(f"Cleanup complete: {total_deleted} total files deleted from temp folders.")
+                    
+        except Exception as e:
+            print(f"Error processing save directory {save_dir}: {e}")
 
     @staticmethod
     def get_ssms_temp():
-        temp_dir = Path(os.getenv("TEMP"))
+        temp_dir = State.temp_dir
         config_files = list(temp_dir.rglob("ColorByRegexConfig.txt"))
 
         if not config_files:
@@ -53,69 +108,3 @@ class FileManager:
             print(f"Found color path: {State.color_path}")
         else:
             print("No customized-groupid-color-*.json found in latest folder.")
-
-    @staticmethod
-    def save_colors():
-        """
-        Loads color mappings from color_mappings.ini and applies them to the temp regex and color json files.
-        """
-        FileManager.get_ssms_temp()
-
-        ini_path = Path(__file__).parent / "config/color_mappings.ini"
-        regex_path = getattr(State, "regex_path", None)
-        color_json_path = getattr(State, "color_path", None)
-
-        if not ini_path.exists():
-            print(f"INI file not found: {ini_path}")
-            return
-        if not regex_path or not Path(regex_path).exists():
-            print(f"Regex file not found: {regex_path}")
-            return
-        if not color_json_path or not Path(color_json_path).exists():
-            print(f"Color JSON file not found: {color_json_path}")
-            return
-
-        # 1. Parse INI for color mappings
-        config = configparser.ConfigParser()
-        config.read(ini_path)
-        color_map = {}  # (server, db) -> color_index
-        for section in config.sections():
-            for db, color_index in config.items(section):
-                color_map[(section.upper(), db.upper())] = int(color_index)
-
-        # 2. Parse regex file to get list of (server, db)
-        regex_line_re = re.compile(r"\\\\([^\\]+)\\\\([^\\(]+)\(\?\=\\\\\|\$\)")
-        regex_entries = []
-        with open(regex_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                match = regex_line_re.fullmatch(line)
-                if match:
-                    server, db = match.group(1).upper(), match.group(2).upper()
-                    regex_entries.append((server, db))
-
-        # 3. Load color JSON and get GroupIds in order
-        with open(color_json_path, encoding="utf-8") as f:
-            color_json = json.load(f)
-        color_map_json = color_json.get("ColorMap", {})
-        group_ids = list(color_map_json.keys())
-
-        # 4. Associate regex_entries with group_ids by order
-        updated = False
-        for i, (server, db) in enumerate(regex_entries):
-            if i >= len(group_ids):
-                break
-            group_id = group_ids[i]
-            color_index = color_map.get((server, db))
-            if color_index is not None:
-                if color_map_json[group_id]["ColorIndex"] != color_index:
-                    color_map_json[group_id]["ColorIndex"] = color_index
-                    updated = True
-
-        # 5. Save JSON if updated
-        if updated:
-            with open(color_json_path, "w", encoding="utf-8") as f:
-                json.dump(color_json, f, indent=2)
-            print(f"Updated color indices in {color_json_path}")
-        else:
-            print("No color indices updated.")
