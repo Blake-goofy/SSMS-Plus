@@ -56,14 +56,30 @@ def parse_server_db_from_title(title):
     return None, None
 
 def get_server_db(timeout=1.5, poll_interval=0.1):
+    """Get server/db info specifically from SQLQuery windows"""
     end = time.time() + timeout
     while time.time() < end:
-        title = get_active_ssms_title()
-        if title:
+        # Get ALL SSMS windows, not just the active one
+        all_windows = gw.getAllWindows()
+        ssms_windows = [w for w in all_windows if w.title and "Microsoft SQL Server Management Studio" in w.title]
+        
+        # Look specifically for SQLQuery windows
+        sqlquery_windows = [w for w in ssms_windows if "SQLQuery" in w.title and " - " in w.title]
+        
+        if sqlquery_windows:
+            # Use the first SQLQuery window found
+            title = sqlquery_windows[0].title.strip()
+            print(f"[watcher.get_server_db] Using SQLQuery window title: {title}")
             server, db = parse_server_db_from_title(title)
             if server and db:
+                print(f"[watcher.get_server_db] Extracted server='{server}', db='{db}'")
                 return server, db
+            else:
+                print(f"[watcher.get_server_db] Could not parse server/db from: {title}")
+        
         time.sleep(poll_interval)
+    
+    print("[watcher.get_server_db] Timeout - no SQLQuery windows found")
     return None, None
 
 def update_color_mappings_ini(config_path, server, db):
@@ -83,9 +99,11 @@ def get_active_ssms_title():
     return None
 
 def on_new_sql(temp_file):
+    print(f"[watcher.on_new_sql] New temp file detected: {temp_file}")
     server, db = get_server_db()
     if not server or not db:
-        print(f"[watcher.on_new_sql] Could not detect server/db from window title, skipping: {temp_file}")
+        print(f"[watcher.on_new_sql] Could not detect server/db from SQLQuery windows, skipping: {temp_file}")
         return
+    print(f"[watcher.on_new_sql] Processing file for {server}.{db}")
     save_dir = state.save_dir
-    SsmsWindow.save_temp_file_with_smart_naming(temp_file, save_dir, server, db)
+    SsmsWindow.save_temp_file(temp_file, save_dir, server, db)

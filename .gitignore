@@ -5,5 +5,9 @@ dist/
 build/
 *.spec
 
+# Inno Setup
+installer/
+Output/
+
 # Settings (user-specific)
 settings.ini

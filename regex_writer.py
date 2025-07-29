@@ -3,7 +3,7 @@ from pathlib import Path
 from state import state, settings
 
 @staticmethod
-def write_server_db_to_regex_file(server, db):
+def write_to_regex_file(server, db):
     import time
     
     # Track this server/database combination in persistent settings
@@ -73,10 +73,10 @@ def regenerate_all_regex_patterns():
     # Get mode and check if we have any tracked combinations
     mode = settings.get_grouping_mode()
     if mode == 'server':
-        tracked_combinations = settings.get_server_combinations()
+        tracked_combinations = settings.get_configured_server_combinations()
         combination_type = "server"
     else:  # 'server_db'
-        tracked_combinations = settings.get_server_db_combinations()
+        tracked_combinations = settings.get_configured_db_combinations()
         combination_type = "server+database"
         
     if not tracked_combinations:
@@ -93,14 +93,14 @@ def regenerate_all_regex_patterns():
     
     if mode == 'server':
         # In server mode, get unique server names and create one pattern per server
-        server_combinations = settings.get_server_combinations()
+        server_combinations = settings.get_configured_server_combinations()
         for server in server_combinations:
             pattern = f"\\\\{server}\\\\.*(?=\\\\|$)"
             if pattern not in pattern_list:
                 pattern_list.append(pattern)
     else:  # 'server_db'
         # In server_db mode, get server.db combinations and create one pattern per combination
-        server_db_combinations = settings.get_server_db_combinations()
+        server_db_combinations = settings.get_configured_db_combinations()
         for combination in server_db_combinations:
             server, db = combination.split('.', 1)  # Split on first dot only
             pattern = f"\\\\{server}\\\\{db}(?=\\\\|$)"

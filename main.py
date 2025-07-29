@@ -50,6 +50,10 @@ def on_settings():
         # Only restart watcher if temp directory changed
         if old_temp != new_temp:
             start_watcher_in_thread(new_temp)
+        
+        # Update tray icon and name if they changed
+        if hasattr(state, 'current_tray_app') and state.current_tray_app:
+            state.current_tray_app.update_icon_and_name()
 
     def show_settings_window():
         state.current_settings_window = SettingsWindow(temp_dir, save_dir, on_save, initial_error)
@@ -70,10 +74,14 @@ if __name__ == '__main__':
         FileManager.mark_session_start()
         FileManager.cleanup_old_temp_files()
     
+    # Clear tab color tracking for new session
+    state.clear_tab_color_tracking()
+    
     # if temp_dir or save_dir isn't a real directory, open the settings window
     if not state.temp_dir or not state.save_dir or not os.path.isdir(state.temp_dir) or not os.path.isdir(state.save_dir):
         on_settings()
     else:
         start_watcher_in_thread(state.temp_dir)
     tray = TrayApp(on_exit=on_exit, on_settings=on_settings)
+    state.current_tray_app = tray  # Store reference for updates
     tray.run()
