@@ -3,22 +3,51 @@ from pathlib import Path
 from state import state, settings
 
 @staticmethod
-def write_to_regex_file(server, db):
-    import time
+def clear_all_regex_patterns():
+    """Clear all regex patterns from ColorByRegexConfig.txt files (for disabled mode)"""
+    temp_dir = Path(state.temp_dir)
+    config_files = list(temp_dir.rglob("ColorByRegexConfig.txt"))
     
+    if not config_files:
+        return
+
+    files_cleared = 0
+    for regex_file_path in config_files:
+        try:
+            # Read existing content
+            with open(regex_file_path, 'r', encoding="utf-8") as f:
+                existing_lines = f.readlines()
+            
+            # Filter out ALL server patterns, keep only non-server lines
+            filtered_lines = []
+            
+            for line in existing_lines:
+                line_stripped = line.strip()
+                # Check if this line looks like one of our server patterns
+                is_server_pattern = (
+                    line_stripped.startswith('\\\\') and 
+                    (line_stripped.endswith('(?=\\|$)') or line_stripped.endswith('(?=\\\\|$)'))
+                )
+                
+                if not is_server_pattern:
+                    filtered_lines.append(line)
+            
+            # Write back only non-server patterns
+            with open(regex_file_path, 'w', encoding="utf-8") as f:
+                f.writelines(filtered_lines)
+            
+            files_cleared += 1
+            
+        except Exception as e:
+            pass
+
+@staticmethod
+def write_to_regex_file(server, db):
     # Track this server/database combination in persistent settings
     settings.add_server_db(server, db)
     
     # Get ALL regex patterns for all tracked combinations
     all_patterns = settings.get_all_regex_patterns()
-    
-    if not all_patterns:
-        return
-    
-    if state.first_run:
-        # Wait 2 seconds for SSMS to create config files, then process them once
-        state.first_run = False
-        time.sleep(2)
     
     temp_dir = Path(state.temp_dir)
     config_files = list(temp_dir.rglob("ColorByRegexConfig.txt"))
@@ -26,7 +55,7 @@ def write_to_regex_file(server, db):
     if not config_files:
         return
     
-    # {len(config_files)} ColorByRegexConfig.txt files")
+    # Process all files to remove old patterns and add new ones (if any)
     processed_files = 0
     
     for regex_file_path in config_files:
@@ -52,11 +81,16 @@ def write_to_regex_file(server, db):
                 else:
                     old_patterns_removed += 1
             
-            # Write back filtered content plus ALL new patterns
+            # Write back filtered content plus new patterns (if any)
             with open(regex_file_path, 'w', encoding="utf-8") as f:
                 f.writelines(filtered_lines)
                 for pattern in all_patterns:
                     f.write(f"{pattern}\n")
+            
+            processed_files += 1
+            
+        except Exception as e:
+            pass
             
             processed_files += 1
             

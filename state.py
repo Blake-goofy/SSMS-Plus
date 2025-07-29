@@ -42,6 +42,18 @@ class State:
         """Clear all tab color tracking (useful for new sessions)"""
         self.tab_colors_applied.clear()
         print("[state] Cleared tab color tracking")
+    
+    def forget_tab_color_applied(self, server, db=None):
+        """Remove a specific server/db combination from the applied colors tracking"""
+        if db is None:
+            key = server.lower()
+        else:
+            key = f"{server.lower()}.{db.lower()}"
+        if key in self.tab_colors_applied:
+            self.tab_colors_applied.remove(key)
+            print(f"[state] Forgot tab color application for: {key}")
+        else:
+            print(f"[state] Tab color for {key} was not in applied set")
 
 # Create shared instances
 settings = Settings()

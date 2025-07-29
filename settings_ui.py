@@ -4,7 +4,7 @@ from tkinter import filedialog
 from pathlib import Path
 import webbrowser
 from regex_writer import regenerate_all_regex_patterns
-from state import settings
+from state import settings, state
 import os
 
 DARK_BG = "#222831"
@@ -31,6 +31,7 @@ class SettingsWindow:
         self.grouping_mode_var = tk.StringVar(value=settings.get_grouping_mode())
         self.tray_icon_var = tk.StringVar(value=settings.get_tray_icon())
         self.tray_name_var = tk.StringVar(value=settings.get_tray_name())
+        self.auto_tab_coloring_var = tk.BooleanVar(value=settings.get_auto_tab_coloring_enabled())
 
         # Info/Error label at the top
         if initial_error:
@@ -78,27 +79,11 @@ class SettingsWindow:
         btn_browse_save.bind("<Enter>", on_hover)
         btn_browse_save.bind("<Leave>", on_leave)
 
-        # Grouping Mode
-        tk.Label(self.root, text="Tab Grouping:", bg=DARK_BG, fg=DARK_FG).grid(row=3, column=0, sticky="w", padx=10, pady=10)
-        
-        grouping_frame = tk.Frame(self.root, bg=DARK_BG)
-        grouping_frame.grid(row=3, column=1, columnspan=2, sticky="w", padx=10, pady=10)
-        
-        tk.Radiobutton(grouping_frame, text="Server only", 
-                      variable=self.grouping_mode_var, value="server",
-                      bg=DARK_BG, fg=DARK_FG, selectcolor=ENTRY_BG,
-                      activebackground=DARK_BG, activeforeground=DARK_FG).pack(side="left", padx=(0, 20))
-        
-        tk.Radiobutton(grouping_frame, text="Server + db", 
-                      variable=self.grouping_mode_var, value="server_db",
-                      bg=DARK_BG, fg=DARK_FG, selectcolor=ENTRY_BG,
-                      activebackground=DARK_BG, activeforeground=DARK_FG).pack(side="left")
-
         # Tray Icon Color
-        tk.Label(self.root, text="Tray Icon:", bg=DARK_BG, fg=DARK_FG).grid(row=4, column=0, sticky="w", padx=10, pady=10)
+        tk.Label(self.root, text="Tray Icon:", bg=DARK_BG, fg=DARK_FG).grid(row=3, column=0, sticky="w", padx=10, pady=10)
         
         icon_frame = tk.Frame(self.root, bg=DARK_BG)
-        icon_frame.grid(row=4, column=1, columnspan=2, sticky="w", padx=10, pady=10)
+        icon_frame.grid(row=3, column=1, columnspan=2, sticky="w", padx=10, pady=10)
         
         tk.Radiobutton(icon_frame, text="Yellow", 
                       variable=self.tray_icon_var, value="yellow",
@@ -111,34 +96,46 @@ class SettingsWindow:
                       activebackground=DARK_BG, activeforeground=DARK_FG).pack(side="left")
 
         # Tray App Name
-        tk.Label(self.root, text="Tray App Name:", bg=DARK_BG, fg=DARK_FG).grid(row=5, column=0, sticky="w", padx=10, pady=10)
+        tk.Label(self.root, text="Tray App Name:", bg=DARK_BG, fg=DARK_FG).grid(row=4, column=0, sticky="w", padx=10, pady=10)
         tk.Entry(self.root, textvariable=self.tray_name_var, bg=ENTRY_BG, fg=DARK_FG, relief='flat', width=40,
-                bd=0, highlightthickness=0).grid(row=5, column=1, columnspan=2, padx=10, pady=10, sticky="w")
+                bd=0, highlightthickness=0).grid(row=4, column=1, columnspan=2, padx=10, pady=10, sticky="w")
 
-        # Tab Coloring Mode
-        tk.Label(self.root, text="Tab Coloring:", bg=DARK_BG, fg=DARK_FG).grid(row=6, column=0, sticky="w", padx=10, pady=10)
+        # Tab Grouping Mode
+        tk.Label(self.root, text="Tab Grouping:", bg=DARK_BG, fg=DARK_FG).grid(row=5, column=0, sticky="w", padx=10, pady=10)
         
-        tab_coloring_frame = tk.Frame(self.root, bg=DARK_BG)
-        tab_coloring_frame.grid(row=6, column=1, columnspan=2, sticky="w", padx=10, pady=10)
+        grouping_frame = tk.Frame(self.root, bg=DARK_BG)
+        grouping_frame.grid(row=5, column=1, columnspan=2, sticky="w", padx=10, pady=10)
         
-        self.tab_server_enabled_var = tk.BooleanVar(value=settings.get_tab_coloring_server_enabled())
-        self.tab_db_enabled_var = tk.BooleanVar(value=settings.get_tab_coloring_db_enabled())
-        
-        tk.Checkbutton(tab_coloring_frame, text="Server only", 
-                      variable=self.tab_server_enabled_var,
+        tk.Radiobutton(grouping_frame, text="Server only", 
+                      variable=self.grouping_mode_var, value="server",
                       bg=DARK_BG, fg=DARK_FG, selectcolor=ENTRY_BG,
                       activebackground=DARK_BG, activeforeground=DARK_FG).pack(side="left", padx=(0, 20))
         
-        tk.Checkbutton(tab_coloring_frame, text="Server + DB", 
-                      variable=self.tab_db_enabled_var,
+        tk.Radiobutton(grouping_frame, text="Server + DB", 
+                      variable=self.grouping_mode_var, value="server_db",
                       bg=DARK_BG, fg=DARK_FG, selectcolor=ENTRY_BG,
-                      activebackground=DARK_BG, activeforeground=DARK_FG).pack(side="left", padx=(0, 20))
+                      activebackground=DARK_BG, activeforeground=DARK_FG).pack(side="left")
+
+        # Auto Tab Coloring
+        tk.Label(self.root, text="Auto Tab Coloring:", bg=DARK_BG, fg=DARK_FG).grid(row=6, column=0, sticky="w", padx=10, pady=10)
         
-        btn_manage_colors = tk.Button(tab_coloring_frame, text="Manage Colors", command=self.open_color_manager, 
+        auto_coloring_frame = tk.Frame(self.root, bg=DARK_BG)
+        auto_coloring_frame.grid(row=6, column=1, columnspan=2, sticky="w", padx=10, pady=10)
+        
+        tk.Checkbutton(auto_coloring_frame, text="Enable automatic tab coloring", 
+                      variable=self.auto_tab_coloring_var,
+                      bg=DARK_BG, fg=DARK_FG, selectcolor=ENTRY_BG,
+                      activebackground=DARK_BG, activeforeground=DARK_FG,
+                      command=self.on_auto_coloring_changed).pack(side="left", padx=(0, 20))
+        
+        self.btn_manage_colors = tk.Button(auto_coloring_frame, text="Manage Colors", command=self.open_color_manager, 
                                      bg=BTN_BG, fg=BTN_FG, relief='flat', width=12, bd=0, highlightthickness=0)
-        btn_manage_colors.pack(side="left", padx=(10, 0))
-        btn_manage_colors.bind("<Enter>", on_hover)
-        btn_manage_colors.bind("<Leave>", on_leave)
+        self.btn_manage_colors.pack(side="left", padx=(10, 0))
+        self.btn_manage_colors.bind("<Enter>", lambda e: self.on_manage_colors_hover(e, True))
+        self.btn_manage_colors.bind("<Leave>", lambda e: self.on_manage_colors_hover(e, False))
+        
+        # Update button state based on auto coloring setting
+        self.update_manage_colors_button()
 
         # Buttons
         btn_frame = tk.Frame(self.root, bg=DARK_BG)
@@ -155,6 +152,9 @@ class SettingsWindow:
         btn_cancel.pack(side="left", padx=10)
         btn_cancel.bind("<Enter>", on_hover)
         btn_cancel.bind("<Leave>", lambda e: on_leave(e, "Close"))
+
+        # Bind Enter key to save function
+        self.root.bind('<Return>', lambda event: self.save())
 
         # Focus and center
         self.root.update_idletasks()
@@ -179,6 +179,27 @@ class SettingsWindow:
         except Exception as e:
             # If there's any error loading the icon, silently continue
             pass
+
+    def on_auto_coloring_changed(self):
+        """Handle auto coloring checkbox changes"""
+        self.update_manage_colors_button()
+    
+    def update_manage_colors_button(self):
+        """Update the state of the manage colors button based on auto coloring setting"""
+        if self.auto_tab_coloring_var.get():
+            # Enable the button
+            self.btn_manage_colors.configure(state="normal", bg=BTN_BG)
+        else:
+            # Disable/gray out the button
+            self.btn_manage_colors.configure(state="disabled", bg="#555555")
+    
+    def on_manage_colors_hover(self, event, is_enter):
+        """Handle hover events for the manage colors button, only if button is enabled"""
+        if self.btn_manage_colors['state'] == 'normal':
+            if is_enter:
+                self.btn_manage_colors.configure(bg=BTN_HOVER)
+            else:
+                self.btn_manage_colors.configure(bg=BTN_BG)
 
     def auto_temp(self):
         """Auto-fill temp directory with current user's temp folder"""
@@ -248,15 +269,12 @@ class SettingsWindow:
         settings.set_grouping_mode(grouping_mode)
         settings.set_tray_icon(tray_icon)
         settings.set_tray_name(tray_name)
-        
-        # Save tab coloring settings
-        settings.set_tab_coloring_server_enabled(self.tab_server_enabled_var.get())
-        settings.set_tab_coloring_db_enabled(self.tab_db_enabled_var.get())
+        settings.set_auto_tab_coloring_enabled(self.auto_tab_coloring_var.get())
         
         # Update window icon if tray icon changed
         self.set_window_icon()
         
-        # If mode changed, regenerate regex patterns
+        # If grouping mode changed, regenerate regex patterns
         if mode_changed:
             regenerate_all_regex_patterns()
         
@@ -266,6 +284,8 @@ class SettingsWindow:
 
     def open_color_manager(self):
         """Open the tab color management window"""
+        if not settings.get_auto_tab_coloring_enabled():
+            return  # Don't open if auto coloring is disabled
         ColorManagerWindow()
 
     def show(self):
@@ -379,48 +399,70 @@ class ColorManagerWindow:
         """Populate the scrollable frame with color options"""
         row = 0
         
-        # Server coloring section
-        if settings.get_tab_coloring_server_enabled():
-            # Section header
-            header_frame = tk.Frame(self.scrollable_frame, bg=DARK_BG)
-            header_frame.grid(row=row, column=0, columnspan=3, sticky="ew", padx=10, pady=(10, 5))
+        # Only show color options if auto coloring is enabled
+        if settings.get_auto_tab_coloring_enabled():
+            grouping_mode = settings.get_grouping_mode()
             
-            tk.Label(header_frame, text="Server Colors", bg=DARK_BG, fg="white", 
-                    font=("Arial", 12, "bold")).pack(anchor="w")
-            
-            tk.Frame(header_frame, bg="white", height=2).pack(fill="x", pady=(2, 0))
-            row += 1
-            
-            # Get all known servers
-            servers = settings.get_configured_server_combinations()
-            for server in servers:
-                self.create_color_row(row, server, None, is_server=True)
+            # Server coloring section (only show in "server" mode)
+            if grouping_mode == "server" and settings.get_tab_coloring_server_enabled():
+                # Section header
+                header_frame = tk.Frame(self.scrollable_frame, bg=DARK_BG)
+                header_frame.grid(row=row, column=0, columnspan=3, sticky="ew", padx=10, pady=(10, 5))
+                
+                tk.Label(header_frame, text="Server Colors", bg=DARK_BG, fg="white", 
+                        font=("Arial", 12, "bold")).pack(anchor="w")
+                
+                tk.Frame(header_frame, bg="white", height=2).pack(fill="x", pady=(2, 0))
                 row += 1
-        
-        # Database coloring section  
-        if settings.get_tab_coloring_db_enabled():
-            # Section header
-            header_frame = tk.Frame(self.scrollable_frame, bg=DARK_BG)
-            header_frame.grid(row=row, column=0, columnspan=3, sticky="ew", padx=10, pady=(20, 5))
-            
-            tk.Label(header_frame, text="Database Colors", bg=DARK_BG, fg="white", 
-                    font=("Arial", 12, "bold")).pack(anchor="w")
-            
-            tk.Frame(header_frame, bg="white", height=2).pack(fill="x", pady=(2, 0))
-            row += 1
-            
-            # Get all known server.database combinations
-            combinations = settings.get_configured_db_combinations()
-            for combo in combinations:
-                if '.' in combo:
-                    server, db = combo.split('.', 1)
-                    self.create_color_row(row, server, db, is_server=False)
+                
+                # Get all known servers
+                servers = settings.get_configured_server_combinations()
+                for server in servers:
+                    self.create_color_row(row, server, None, is_server=True)
                     row += 1
+            
+            # Database coloring section (only show in "server_db" mode)
+            if grouping_mode == "server_db" and settings.get_tab_coloring_db_enabled():
+                # Section header
+                header_frame = tk.Frame(self.scrollable_frame, bg=DARK_BG)
+                header_frame.grid(row=row, column=0, columnspan=3, sticky="ew", padx=10, pady=(10, 5))
+                
+                tk.Label(header_frame, text="Server + Database Colors", bg=DARK_BG, fg="white", 
+                        font=("Arial", 12, "bold")).pack(anchor="w")
+                
+                tk.Frame(header_frame, bg="white", height=2).pack(fill="x", pady=(2, 0))
+                row += 1
+                
+                # Get all known server.database combinations
+                combinations = settings.get_configured_db_combinations()
+                for combo in combinations:
+                    if '.' in combo:
+                        server, db = combo.split('.', 1)
+                        self.create_color_row(row, server, db, is_server=False)
+                        row += 1
         
-        # If no sections are enabled
-        if not settings.get_tab_coloring_server_enabled() and not settings.get_tab_coloring_db_enabled():
-            tk.Label(self.scrollable_frame, text="Tab coloring is disabled.\nEnable it in the main settings to manage colors.", 
+        # If auto coloring is disabled
+        if not settings.get_auto_tab_coloring_enabled():
+            tk.Label(self.scrollable_frame, text="Auto tab coloring is disabled.\nEnable it in the main settings to manage colors.", 
                     bg=DARK_BG, fg="#FF5555", font=("Arial", 11), justify="center").grid(row=0, column=0, pady=50)
+        # If auto coloring is enabled but no servers/databases exist yet
+        else:
+            grouping_mode = settings.get_grouping_mode()
+            has_content = False
+            
+            if grouping_mode == "server" and settings.get_configured_server_combinations():
+                has_content = True
+            elif grouping_mode == "server_db" and settings.get_configured_db_combinations():
+                has_content = True
+            
+            if not has_content:
+                if grouping_mode == "server":
+                    message = "No servers found yet.\nOpen a document in SSMS to see servers here."
+                else:  # server_db
+                    message = "No server + database combinations found yet.\nOpen a document in SSMS to see combinations here."
+                
+                tk.Label(self.scrollable_frame, text=message, 
+                        bg=DARK_BG, fg="white", font=("Arial", 11), justify="center").grid(row=0, column=0, pady=50)
         
         # Update scroll region after content is populated
         self.root.after(100, self.update_scroll_region)
@@ -452,29 +494,37 @@ class ColorManagerWindow:
         
         # Name label
         name_label = tk.Label(self.scrollable_frame, text=display_name, bg=DARK_BG, fg=DARK_FG, 
-                             font=("Arial", 10), width=20, anchor="w")
+                             font=("Arial", 10, "bold"), width=20, anchor="w")
         name_label.grid(row=row, column=0, sticky="w", padx=(10, 5), pady=2)
         
         # Color dropdown
         color_var = tk.StringVar()
         color_combo = tk.OptionMenu(self.scrollable_frame, color_var, *[name for _, (name, _) in enumerate(self.COLORS)])
         color_combo.configure(bg=ENTRY_BG, fg=DARK_FG, relief='flat', width=15, 
-                             highlightthickness=0, bd=0, activebackground=BTN_HOVER)
+                             highlightthickness=0, bd=0, activebackground="#555555")
         # Style the dropdown menu
-        color_combo['menu'].configure(bg=ENTRY_BG, fg=DARK_FG, relief='flat', bd=0)
+        color_combo['menu'].configure(bg=ENTRY_BG, fg=DARK_FG, relief='flat', bd=0, 
+                                    activebackground="#555555", activeborderwidth=0)
         color_combo.grid(row=row, column=1, padx=5, pady=2)
         
         # Set current value
         color_var.set(self.COLORS[current_color][0])
         
-        # Color swatch - smaller rounded square
-        swatch_frame = tk.Frame(self.scrollable_frame, bg=self.COLORS[current_color][1], 
-                               width=20, height=20, relief="flat", bd=0)
-        swatch_frame.grid(row=row, column=2, padx=(5, 10), pady=2)
-        swatch_frame.grid_propagate(False)
+        # Color swatch - rounded square using Canvas
+        swatch_canvas = tk.Canvas(self.scrollable_frame, width=20, height=20, bg=DARK_BG, highlightthickness=0)
+        swatch_canvas.grid(row=row, column=2, padx=(5, 10), pady=2)
+        
+        # Create simple flat rectangle
+        def create_swatch(canvas, x1, y1, x2, y2, fill):
+            canvas.delete("all")  # Clear previous content
+            # Simple flat rectangle with sharp corners
+            canvas.create_rectangle(x1, y1, x2, y2, fill=fill, outline="")
+        
+        # Initial color
+        create_swatch(swatch_canvas, 2, 2, 18, 18, self.COLORS[current_color][1])
         
         # Bind color change
-        def on_color_change(value, s=server, d=db, is_srv=is_server, swatch=swatch_frame):
+        def on_color_change(value, s=server, d=db, is_srv=is_server, swatch=swatch_canvas):
             try:
                 # Find the color index by name
                 color_index = None
@@ -488,14 +538,18 @@ class ColorManagerWindow:
                     
                 color_hex = self.COLORS[color_index][1]
                 
-                # Update swatch
-                swatch.configure(bg=color_hex)
+                # Update swatch using the swatch function
+                create_swatch(swatch, 2, 2, 18, 18, color_hex)
                 
                 # Save to settings
                 if is_srv:
                     settings.set_tab_color_for_server(s, color_index)
+                    # Forget this server from applied colors so it gets colored on next save
+                    state.forget_tab_color_applied(s)
                 else:
                     settings.set_tab_color_for_database(s, d, color_index)
+                    # Forget this server/db combination from applied colors so it gets colored on next save
+                    state.forget_tab_color_applied(s, d)
                 
                 # Show success message
                 self.flash_status("Color saved!", "#00FF99")

@@ -70,24 +70,26 @@ class Settings:
         self.set_setting("Appearance", "TrayName", name)
         self.save()
 
+    # Auto tab coloring setting
+    def get_auto_tab_coloring_enabled(self):
+        """Get whether automatic tab coloring is enabled"""
+        return self.get_setting("Appearance", "autocolor", fallback="true").lower() == "true"
+    
+    def set_auto_tab_coloring_enabled(self, enabled):
+        """Set whether automatic tab coloring is enabled"""
+        self.set_setting("Appearance", "autocolor", "true" if enabled else "false")
+        self.save()
+
     # Tab coloring settings
     def get_tab_coloring_server_enabled(self):
-        """Get whether server-based tab coloring is enabled"""
-        return self.get_setting("TabColoringServer", "enabled", fallback="false").lower() == "true"
-    
-    def set_tab_coloring_server_enabled(self, enabled):
-        """Set whether server-based tab coloring is enabled"""
-        self.set_setting("TabColoringServer", "enabled", "true" if enabled else "false")
-        self.save()
+        """Check if server-based tab coloring is enabled based on grouping mode"""
+        mode = self.get_grouping_mode()
+        return mode == "server" or mode == "server_db"
     
     def get_tab_coloring_db_enabled(self):
-        """Get whether database-based tab coloring is enabled"""
-        return self.get_setting("TabColoringDB", "enabled", fallback="false").lower() == "true"
-    
-    def set_tab_coloring_db_enabled(self, enabled):
-        """Set whether database-based tab coloring is enabled"""
-        self.set_setting("TabColoringDB", "enabled", "true" if enabled else "false")
-        self.save()
+        """Check if database-based tab coloring is enabled based on grouping mode"""
+        mode = self.get_grouping_mode()
+        return mode == "server_db"
     
     def get_tab_color_for_combination(self, server, db=None):
         """Get the tab color index for a server/db combination
@@ -170,13 +172,8 @@ class Settings:
             self.set_tab_color_for_database(server, db, color_index)
     
     def get_tab_coloring_enabled(self):
-        """Legacy method - returns True if either server or database coloring is enabled"""
-        return self.get_tab_coloring_server_enabled() or self.get_tab_coloring_db_enabled()
-    
-    def set_tab_coloring_enabled(self, enabled):
-        """Legacy method - enables/disables both server and database coloring"""
-        self.set_tab_coloring_server_enabled(enabled)
-        self.set_tab_coloring_db_enabled(enabled)
+        """Returns True if auto tab coloring is enabled"""
+        return self.get_auto_tab_coloring_enabled()
 
     def get_configured_db_combinations(self):
         """Get the list of server.database combinations that have colors configured"""
@@ -185,7 +182,7 @@ class Settings:
         
         combinations = []
         for key in self.config["TabColoringDB"]:
-            if key != "enabled" and "." in key:
+            if "." in key:
                 # Convert back to display format (uppercase)
                 parts = key.split(".", 1)
                 if len(parts) == 2:
@@ -201,16 +198,17 @@ class Settings:
         
         servers = []
         for key in self.config["TabColoringServer"]:
-            if key != "enabled":
-                # Convert back to display format (uppercase)
-                servers.append(key.upper())
+            # Convert back to display format (uppercase)
+            servers.append(key.upper())
         
         return sorted(servers)
 
     def add_server_db(self, server, db):
         """Add a server/database combination to TabColoring sections with default colors"""
-        # Add to database coloring section if enabled
-        if self.get_tab_coloring_db_enabled():
+        mode = self.get_grouping_mode()
+        
+        # Add to database coloring section if in server_db mode
+        if mode == "server_db":
             db_key = f"{server.lower()}.{db.lower()}"
             if not self.config.has_section("TabColoringDB"):
                 self.config.add_section("TabColoringDB")
@@ -220,8 +218,8 @@ class Settings:
                 self.set_setting("TabColoringDB", db_key, "0")  # Default color
                 print(f"[settings] Added new database combination: {server}.{db} with default color")
         
-        # Add to server coloring section if enabled  
-        if self.get_tab_coloring_server_enabled():
+        # Add to server coloring section if in server or server_db mode  
+        if mode in ["server", "server_db"]:
             server_key = server.lower()
             if not self.config.has_section("TabColoringServer"):
                 self.config.add_section("TabColoringServer")

@@ -63,7 +63,7 @@ def on_settings():
     threading.Thread(target=show_settings_window).start()
 
 def on_exit():
-    # Stop watcher if it's running
+    # Stop watcher if it's running 
     if state.current_watcher_observer:
         state.current_watcher_observer.stop()
         state.current_watcher_observer = None

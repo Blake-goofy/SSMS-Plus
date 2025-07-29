@@ -116,26 +116,39 @@ class SsmsWindow:
         except Exception as e:
             print(f"[ssms_window.apply_tab_color] Error applying tab color: {e}")
     
+    @staticmethod
+    def is_combination_in_regex(server, db):
+        """Check if the server/db combination exists in the configured regex patterns"""
+        try:
+            # Get the current grouping mode to determine what to check
+            mode = settings.get_grouping_mode()
+            
+            if mode == 'server':
+                # In server mode, check if the server exists in configured servers
+                configured_servers = settings.get_configured_server_combinations()
+                return server.upper() in configured_servers
+            else:  # 'server_db'
+                # In server_db mode, check if the server.db combination exists
+                configured_combinations = settings.get_configured_db_combinations()
+                target_combination = f"{server.upper()}.{db.upper()}"
+                return target_combination in configured_combinations
+                
+        except Exception as e:
+            print(f"[ssms_window.is_combination_in_regex] Error checking combination: {e}")
+            return False
+    
     
     @staticmethod
     def save_temp_file(temp_file, save_dir, server, db):
         """Save function that waits for loading to complete before saving"""
         
-        # Wait for loading to complete and file to be saved properly
-        if not SsmsWindow.wait_for_query():
-            print("[ssms_window.smart_naming] Save didn't complete properly, using default naming")
-            return SsmsWindow.save_to_db_dir(temp_file, save_dir, server, db)
-        
-        # Generate consistent filename (no workflow detection needed)
+        # Try to wait for loading to complete
+        SsmsWindow.wait_for_query()
+        # Extract temp name for unique naming
         basename = os.path.basename(temp_file).replace('..sql', '.sql')
-        if '_' in basename:
-            unique_part = basename.split('_')[-1].replace('.sql', '')
-        else:
-            unique_part = basename.replace('.sql', '')
         
-        # Use consistent naming pattern for all files
-        custom_filename = f"{server}_{db}_{unique_part}.sql"
-        print(f"[ssms_window.smart_naming] File saved successfully, target name: {custom_filename}")
+        custom_filename = f"{server}_{db}_{basename}"
+        print(f"[ssms_window.save_temp_file] Using filename: {custom_filename}")
         
         # Create the target path and save
         target_path = os.path.join(save_dir, server, db, 'temp', custom_filename)
@@ -146,21 +159,14 @@ class SsmsWindow:
         write_to_regex_file(server, db)
         # Apply tab coloring if enabled
         SsmsWindow.apply_tab_color(server, db)
-        
-        return target_path
-    
-    @staticmethod
-    def save_to_db_dir(temp_file, save_dir, server, db):
 
-        basename = os.path.basename(temp_file).replace('..sql', '.sql')
-        target_path = os.path.join(save_dir, server, db, 'temp', server+'_'+db+'_'+basename)
-        # Ensure Windows backslashes in target path
-        target_path = target_path.replace('/', '\\')
-        FileManager.create_save_dir(os.path.dirname(target_path))
-        SsmsWindow.automate_save_as(target_path)
-        write_to_regex_file(server, db)
-        # Apply tab coloring if enabled
-        SsmsWindow.apply_tab_color(server, db)
+        # Check if the server/db combination exists in the regex patterns
+        # If not, retry write_to_regex_file and apply_tab_color once
+        if not SsmsWindow.is_combination_in_regex(server, db):
+            print(f"[ssms_window.save_temp_file] Combination {server}.{db} not found in regex, retrying...")
+            write_to_regex_file(server, db)
+            SsmsWindow.apply_tab_color(server, db)
+        
         return target_path
 
     @staticmethod
@@ -190,45 +196,71 @@ class SsmsWindow:
                 time.sleep(0.05)
             return False
         
-        if not wait_until_keys_released():
-            # Restore clipboard before returning
-            if original_clipboard is not None:
-                try:
-                    pyperclip.copy(original_clipboard)
-                except Exception:
-                    pass
-            return
-        
-        pyperclip.copy(target_path)
-        # must use keyDown/press/keyUp to avoid issues with modifier keys
-        pyautogui.keyDown('ctrl')
-        pyautogui.press('s')
-        pyautogui.keyUp('ctrl')
-
-        def wait_for_save_as_dialog(timeout=1):
-            end = time.time() + timeout
+        def perform_save_attempt():
+            """Perform a single save attempt"""
+            if not wait_until_keys_released():
+                return False
+            
+            pyperclip.copy(target_path)
+            # must use keyDown/press/keyUp to avoid issues with modifier keys
+            pyautogui.keyDown('ctrl')
+            pyautogui.press('s')
+            pyautogui.keyUp('ctrl')
+            
+            # Check for Save As dialog with loading window detection
+            end = time.time() + 0.5
             while time.time() < end:
+                # Check if Save As dialog appeared
                 w = pygetwindow.getActiveWindow()
                 if w and w.title.strip().startswith("Save File As"):
+                    print("[ssms_window.perform_save_attempt] Save As dialog appeared")
+                    pyautogui.hotkey('ctrl', 'v')
+                    pyautogui.press('enter')
                     return True
-                time.sleep(0.05)
-            return False
-
-        
-        if not wait_for_save_as_dialog():
-            # Restore clipboard before returning
-            if original_clipboard is not None:
+                
+                # Check if loading window appeared (indicating save was intercepted)
                 try:
-                    pyperclip.copy(original_clipboard)
-                except Exception:
-                    pass
-            return
+                    all_windows = pygetwindow.getAllWindows()
+                    loading_windows = [w for w in all_windows if w.title and w.title.strip() == "Microsoft SQL Server Management Studio"]
                     
-        pyautogui.hotkey('ctrl', 'v')
-        pyautogui.press('enter')
+                    if loading_windows:
+                        print("[ssms_window.perform_save_attempt] Loading window detected, waiting for it to disappear...")
+                        
+                        # Wait for loading window to go away
+                        loading_end = time.time() + 10  # Give it 10 seconds to load
+                        while time.time() < loading_end:
+                            all_windows = pygetwindow.getAllWindows()
+                            loading_windows = [w for w in all_windows if w.title and w.title.strip() == "Microsoft SQL Server Management Studio"]
+                            if not loading_windows:
+                                print("[ssms_window.perform_save_attempt] Loading window gone, retrying save...")
+                                break
+                            time.sleep(0.1)
+                        
+                        # Retry the save after loading is done
+                        pyautogui.keyDown('ctrl')
+                        pyautogui.press('s')
+                        pyautogui.keyUp('ctrl')
+                        # Continue the loop to check for Save As dialog again
+                        
+                except Exception as e:
+                    print(f"[ssms_window.perform_save_attempt] Error checking for loading window: {e}")
+                
+                time.sleep(0.01)
+            
+            print("[ssms_window.perform_save_attempt] Save As dialog did not appear within timeout")
+            return False
         
-        # Wait a moment for the save dialog to close, then restore clipboard
-        time.sleep(0.5)
+        # First save attempt
+        print(f"[ssms_window.automate_save_as] First save attempt for: {target_path}")
+        if perform_save_attempt():
+            print(f"[ssms_window.automate_save_as] Save successful on first attempt")
+        else:
+            print(f"[ssms_window.automate_save_as] First attempt failed, retrying...")
+            # Second attempt - don't check result, just proceed
+            perform_save_attempt()
+            print(f"[ssms_window.automate_save_as] Second attempt completed")
+        
+        # Restore clipboard
         if original_clipboard is not None:
             try:
                 pyperclip.copy(original_clipboard)
