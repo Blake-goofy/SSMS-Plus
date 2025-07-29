@@ -1,8 +1,14 @@
 """Settings loader/saver (INI interface)."""
 import configparser
 import os
+import sys
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "settings.ini")
+if getattr(sys, 'frozen', False):
+    # Running as exe
+    CONFIG_PATH = os.path.join(os.path.dirname(sys.executable), "settings.ini")
+else:
+    # Running as script
+    CONFIG_PATH = os.path.join(os.path.dirname(__file__), "settings.ini")
 
 class Settings:
     def __init__(self, config_path=CONFIG_PATH):
