@@ -830,17 +830,13 @@ class SettingsWindow:
                     with open(temp_file, 'wb') as f:
                         f.write(response.content)
                     
-                    self.root.after(0, lambda: self.info_var.set("Installing update..."))
+                    self.root.after(0, lambda: self.info_var.set("Preparing to install update..."))
                     
-                    # Run the installer
-                    # Use /SILENT flag for silent installation
-                    subprocess.Popen([temp_file, "/SILENT"], shell=True)
-                    
-                    # Show completion message and close app
+                    # Show completion message
                     self.root.after(0, lambda: self.show_update_installing_message())
                     
-                    # Close the app after a short delay to let the installer take over
-                    self.root.after(3000, lambda: sys.exit(0))
+                    # Schedule the update process to run after a delay
+                    self.root.after(2000, lambda: self.execute_update(temp_file))
                     
                 else:
                     self.root.after(0, lambda: self.show_update_error_message())
@@ -854,9 +850,34 @@ class SettingsWindow:
         # Start download in background thread
         threading.Thread(target=download_and_install, daemon=True).start()
     
+    def execute_update(self, installer_path):
+        """Execute the update installer and properly close the application"""
+        try:
+            # Start the installer
+            subprocess.Popen([installer_path, "/SILENT"], shell=True)
+            
+            # Properly shutdown the application
+            # First close the settings window
+            self.root.destroy()
+            
+            # Then trigger application exit through the main app
+            # This allows proper cleanup of resources
+            if hasattr(state, 'current_tray_app') and state.current_tray_app:
+                # Use the tray app's exit method for proper cleanup
+                state.current_tray_app.root.after(100, state.current_tray_app.root.quit)
+            else:
+                # Fallback to direct exit
+                import os
+                os._exit(0)
+                
+        except Exception as e:
+            print(f"Error executing update: {e}")
+            # If update fails, just close settings window
+            self.root.destroy()
+    
     def show_update_installing_message(self):
         """Show message that update is installing"""
-        self.info_var.set("Update installing - app will restart...")
+        self.info_var.set("Closing app for update - installer will start...")
         self.flash_info_label("#00FF99")  # Green
 
     def enable_dark_title_bar(self):
