@@ -295,6 +295,10 @@ class SettingsWindow:
             ("Pink", "#e0a3a5")       # 16
         ]
         
+        # Track known combinations for auto-refresh
+        self.last_known_servers = set()
+        self.last_known_combinations = set()
+        
         # Status label at top
         self.color_status_var = tk.StringVar(value="Manage tab colors for servers and databases")
         self.color_status_label = tk.Label(self.color_frame, textvariable=self.color_status_var, bg=DARK_BG, fg="#FFD700", 
@@ -304,8 +308,9 @@ class SettingsWindow:
         # Create scrollable frame for color options
         self.create_color_scrollable_frame()
         
-        # Populate the color options
+        # Populate the color options and start auto-refresh
         self.populate_color_options()
+        self.start_auto_refresh()
 
     def create_color_scrollable_frame(self):
         """Create a scrollable frame for the color options"""
@@ -363,6 +368,39 @@ class SettingsWindow:
         # Repopulate the color options
         self.populate_color_options()
 
+    def start_auto_refresh(self):
+        """Start the automatic refresh timer"""
+        self.check_for_new_combinations()
+        # Check every 3 seconds for new combinations
+        self.root.after(3000, self.start_auto_refresh)
+
+    def check_for_new_combinations(self):
+        """Check if new server/database combinations have been discovered"""
+        try:
+            grouping_mode = settings.get_grouping_mode()
+            needs_refresh = False
+            
+            if grouping_mode == "server":
+                current_servers = set(settings.get_configured_server_combinations())
+                if current_servers != self.last_known_servers:
+                    needs_refresh = True
+                    self.last_known_servers = current_servers
+                    
+            elif grouping_mode == "server_db":
+                current_combinations = set(settings.get_configured_db_combinations())
+                if current_combinations != self.last_known_combinations:
+                    needs_refresh = True
+                    self.last_known_combinations = current_combinations
+            
+            if needs_refresh:
+                self.refresh_color_tab()
+                # Brief visual feedback for auto-refresh
+                self.flash_color_status("New servers/databases detected!", "#00AAFF")
+                
+        except Exception as e:
+            # Silently handle any errors during auto-refresh
+            pass
+
     def populate_color_options(self):
         """Populate the scrollable frame with color options"""
         row = 0
@@ -383,8 +421,9 @@ class SettingsWindow:
                 tk.Frame(header_frame, bg="white", height=2).pack(fill="x", pady=(2, 0))
                 row += 1
                 
-                # Get all known servers
+                # Get all known servers and update tracking
                 servers = settings.get_configured_server_combinations()
+                self.last_known_servers = set(servers)
                 for server in servers:
                     self.create_color_row(row, server, None, is_server=True)
                     row += 1
@@ -401,8 +440,9 @@ class SettingsWindow:
                 tk.Frame(header_frame, bg="white", height=2).pack(fill="x", pady=(2, 0))
                 row += 1
                 
-                # Get all known server.database combinations
+                # Get all known server.database combinations and update tracking
                 combinations = settings.get_configured_db_combinations()
+                self.last_known_combinations = set(combinations)
                 for combo in combinations:
                     if '.' in combo:
                         server, db = combo.split('.', 1)
