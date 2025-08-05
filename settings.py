@@ -207,8 +207,8 @@ class Settings:
         """Add a server/database combination to TabColoring sections with default colors"""
         mode = self.get_grouping_mode()
         
-        # Add to database coloring section if in server_db mode
-        if mode == "server_db":
+        # Add to database coloring section if in server_db mode and db is provided
+        if mode == "server_db" and db:
             db_key = f"{server.lower()}.{db.lower()}"
             if not self.config.has_section("TabColoringDB"):
                 self.config.add_section("TabColoringDB")

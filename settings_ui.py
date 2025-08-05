@@ -1,5 +1,4 @@
 import tkinter as tk
-import threading
 from tkinter import filedialog
 from pathlib import Path
 import webbrowser
@@ -88,12 +87,14 @@ class SettingsWindow:
         tk.Radiobutton(icon_frame, text="Yellow", 
                       variable=self.tray_icon_var, value="yellow",
                       bg=DARK_BG, fg=DARK_FG, selectcolor=ENTRY_BG,
-                      activebackground=DARK_BG, activeforeground=DARK_FG).pack(side="left", padx=(0, 20))
+                      activebackground=DARK_BG, activeforeground=DARK_FG,
+                      command=self.on_tray_icon_changed).pack(side="left", padx=(0, 20))
         
         tk.Radiobutton(icon_frame, text="Red", 
                       variable=self.tray_icon_var, value="red",
                       bg=DARK_BG, fg=DARK_FG, selectcolor=ENTRY_BG,
-                      activebackground=DARK_BG, activeforeground=DARK_FG).pack(side="left")
+                      activebackground=DARK_BG, activeforeground=DARK_FG,
+                      command=self.on_tray_icon_changed).pack(side="left")
 
         # Tray App Name
         tk.Label(self.root, text="Tray App Name:", bg=DARK_BG, fg=DARK_FG).grid(row=4, column=0, sticky="w", padx=10, pady=10)
@@ -109,12 +110,14 @@ class SettingsWindow:
         tk.Radiobutton(grouping_frame, text="Server only", 
                       variable=self.grouping_mode_var, value="server",
                       bg=DARK_BG, fg=DARK_FG, selectcolor=ENTRY_BG,
-                      activebackground=DARK_BG, activeforeground=DARK_FG).pack(side="left", padx=(0, 20))
+                      activebackground=DARK_BG, activeforeground=DARK_FG,
+                      command=self.on_grouping_mode_changed).pack(side="left", padx=(0, 20))
         
         tk.Radiobutton(grouping_frame, text="Server + DB", 
                       variable=self.grouping_mode_var, value="server_db",
                       bg=DARK_BG, fg=DARK_FG, selectcolor=ENTRY_BG,
-                      activebackground=DARK_BG, activeforeground=DARK_FG).pack(side="left")
+                      activebackground=DARK_BG, activeforeground=DARK_FG,
+                      command=self.on_grouping_mode_changed).pack(side="left")
 
         # Auto Tab Coloring
         tk.Label(self.root, text="Auto Tab Coloring:", bg=DARK_BG, fg=DARK_FG).grid(row=6, column=0, sticky="w", padx=10, pady=10)
@@ -181,8 +184,37 @@ class SettingsWindow:
             pass
 
     def on_auto_coloring_changed(self):
-        """Handle auto coloring checkbox changes"""
+        """Handle auto coloring checkbox changes - save immediately"""
+        settings.set_auto_tab_coloring_enabled(self.auto_tab_coloring_var.get())
         self.update_manage_colors_button()
+        self.show_saved_message()
+    
+    def on_tray_icon_changed(self):
+        """Handle tray icon changes - save immediately"""
+        settings.set_tray_icon(self.tray_icon_var.get())
+        self.set_window_icon()  # Update window icon immediately
+        self.show_saved_message()
+    
+    def on_grouping_mode_changed(self):
+        """Handle grouping mode changes - save immediately"""
+        old_mode = settings.get_grouping_mode()
+        new_mode = self.grouping_mode_var.get()
+        
+        if old_mode != new_mode:
+            settings.set_grouping_mode(new_mode)
+            # Regenerate regex patterns when mode changes
+            regenerate_all_regex_patterns()
+            self.show_saved_message()
+    
+    def show_saved_message(self):
+        """Show a brief 'saved' message"""
+        original_text = self.info_var.get()
+        original_color = self.info_label.cget("fg")
+        self.info_var.set("Setting saved!")
+        self.flash_info_label("#00FF99")  # Green for success
+        # Restore original message and color after 1.5 seconds
+        self.root.after(1500, lambda: self.info_var.set(original_text))
+        self.root.after(1500, lambda: self.info_label.configure(fg=original_color))
     
     def update_manage_colors_button(self):
         """Update the state of the manage colors button based on auto coloring setting"""
@@ -247,8 +279,6 @@ class SettingsWindow:
     def save(self):
         temp = self.temp_dir_var.get().strip()
         save = self.save_dir_var.get().strip()
-        grouping_mode = self.grouping_mode_var.get()
-        tray_icon = self.tray_icon_var.get()
         tray_name = self.tray_name_var.get().strip()
         
         if not temp or not save or not os.path.isdir(temp) or not os.path.isdir(save):
@@ -261,26 +291,12 @@ class SettingsWindow:
             self.flash_info_label("#FF5555")  # Red for error
             return
             
-        # Check if grouping mode changed
-        old_mode = settings.get_grouping_mode()
-        mode_changed = old_mode != grouping_mode
-        
-        # Save all settings
-        settings.set_grouping_mode(grouping_mode)
-        settings.set_tray_icon(tray_icon)
+        # Save tray name setting
         settings.set_tray_name(tray_name)
-        settings.set_auto_tab_coloring_enabled(self.auto_tab_coloring_var.get())
         
-        # Update window icon if tray icon changed
-        self.set_window_icon()
-        
-        # If grouping mode changed, regenerate regex patterns
-        if mode_changed:
-            regenerate_all_regex_patterns()
-        
+        # Call the callback with directory settings
         self.on_save(temp, save)
-        self.info_var.set("Settings saved successfully.")
-        self.flash_info_label("#00FF99")  # Green for success
+        self.show_saved_message()
 
     def open_color_manager(self):
         """Open the tab color management window"""
