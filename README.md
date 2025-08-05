@@ -4,21 +4,9 @@ Automatically organizes your SQL Server Management Studio files and colors tabs 
 
 ## What It Does
 
-**File Organization**: Saves your SQL files in organized folders:
-```
-Save Directory/
-├── PROD-SQL01/
-│   ├── CustomerDB/
-│   │   ├── query1.sql
-│   │   └── query2.sql
-│   └── OrdersDB/
-│       └── report.sql
-└── TEST-SQL01/
-    └── TestDB/
-        └── debug.sql
-```
-
-**Tab Coloring**: Groups and colors SSMS tabs for easy identification.
+- **File Organization**: Automatically saves your SQL files in organized server/database folders
+- **Tab Coloring**: Colors SSMS tabs by server or server+database for easy identification
+- **Background Operation**: Runs silently in your system tray
 
 ## Setup
 
@@ -30,38 +18,25 @@ In SSMS: **Tools** → **Options** → **Environment** → **Tabs and Windows** 
 - **Left-click** the tray icon to open settings
 - Set your **Temp Directory** (click "Auto" for default)
 - Set your **Save Directory** (where organized files go)
-- Choose tab grouping mode
+- Choose tab grouping mode (Server only or Server + Database)
+- Configure tab colors in the "Tab Colors" tab
 - Click **Save**
-
-## Tab Grouping Modes
-
-**Server Only**: All tabs for same server get same color
-```
-PROD-SQL01 (Blue)    TEST-SQL01 (Green)
-├── CustomerDB       ├── CustomerDB
-├── OrdersDB         └── TestDB
-└── ReportsDB
-```
-
-**Server + Database**: Each server+database combo gets unique color
-```
-PROD-SQL01\CustomerDB (Blue)
-PROD-SQL01\OrdersDB (Red)  
-PROD-SQL01\ReportsDB (Yellow)
-TEST-SQL01\CustomerDB (Green)
-TEST-SQL01\TestDB (Purple)
-```
 
 ## Usage
 
-Just use SSMS normally! SSMS Plus runs in the background and automatically:
-- Organizes new SQL files into server/database folders
-- Updates ssms regex file based on your grouping preference
+Just use SSMS normally! SSMS Plus runs in the background and automatically organizes your files and colors your tabs.
+
+**Important**: The first document you create after opening SSMS may not work correctly (wrong name and no coloring). Just ignore that first file - all subsequent files will work properly.
+
+## Features
+
+- **Automatic Updates**: Check for updates directly from the settings window
+- **Tab Grouping Modes**: Color by server only or by server+database combinations
+- **Customizable Colors**: Assign specific colors to each server or database
+- **System Tray Integration**: Minimal interface that stays out of your way
 
 ## Troubleshooting
 
-**Colors not working?** Check that "Color tabs by regular expression" is enabled in SSMS Options.
+**Colors not working?** Make sure "Color tabs by regular expression" is enabled in SSMS Options.
 
-**Colors not saving?** SSMS does not save tab colors between sessions, so if you close SSMS, tab colors will be lost.
-
-**Files not saving?** Verify temp directory matches where SSMS creates files (right-click any SSMS tab → "Open Containing Folder").
+**Files not organizing?** Verify the temp directory matches where SSMS creates files (right-click any SSMS tab → "Open Containing Folder").

@@ -121,6 +121,11 @@ class SsmsWindow:
                 print(f"[ssms_window.apply_tab_color] Tab coloring is disabled, skipping")
                 return
             
+            # Check if the ColorByRegexConfig.txt file exists (this also clears state if missing)
+            if not SsmsWindow.is_combination_in_actual_regex_files(server, db):
+                print(f"[ssms_window.apply_tab_color] Regex file missing or combination not found, skipping color application")
+                return
+            
             # Check if we've already applied color for this combination this session
             if state.is_tab_color_applied(server, db):
                 print(f"[ssms_window.apply_tab_color] Tab color already applied for {server}.{db}, skipping")
@@ -140,24 +145,61 @@ class SsmsWindow:
             print(f"[ssms_window.apply_tab_color] Error applying tab color: {e}")
     
     @staticmethod
-    def is_combination_in_regex(server, db):
-        """Check if the server/db combination exists in the configured regex patterns"""
+    def is_combination_in_actual_regex_files(server, db):
+        """Check if the ColorByRegexConfig.txt file exists and clear state if no color JSON files exist"""
         try:
-            # Get the current grouping mode to determine what to check
-            mode = settings.get_grouping_mode()
+            # Get the temp directory and search for the actual SSMS GUID folder
+            temp_dir_str = settings.get_temp_dir()
             
-            if mode == 'server':
-                # In server mode, check if the server exists in configured servers
-                configured_servers = settings.get_configured_server_combinations()
-                return server.upper() in configured_servers
-            else:  # 'server_db'
-                # In server_db mode, check if the server.db combination exists
-                configured_combinations = settings.get_configured_db_combinations()
-                target_combination = f"{server.upper()}.{db.upper()}"
-                return target_combination in configured_combinations
+            if not temp_dir_str:
+                print(f"[ssms_window.is_combination_in_actual_regex_files] No temp directory configured")
+                return False
+            
+            from pathlib import Path
+            temp_dir = Path(temp_dir_str)
+            
+            # Look for ColorByRegexConfig.txt files recursively (they're in GUID subfolders)
+            config_files = list(temp_dir.rglob("ColorByRegexConfig.txt"))
+            
+            if not config_files:
+                print(f"[ssms_window.is_combination_in_actual_regex_files] No ColorByRegexConfig.txt files found in {temp_dir}")
+                # Clear all applied color state since no config files exist
+                print(f"[ssms_window.is_combination_in_actual_regex_files] Clearing all tab color state due to missing config files")
+                state.clear_tab_color_tracking()
+                return False
+            
+            # Find the most recent config file (in case there are multiple GUID folders)
+            def folder_time(path):
+                folder = path.parent
+                stat = folder.stat()
+                return max(stat.st_mtime, stat.st_ctime)
+            
+            latest_config = max(config_files, key=folder_time)
+            latest_folder = latest_config.parent
+            
+            print(f"[ssms_window.is_combination_in_actual_regex_files] Found ColorByRegexConfig.txt in: {latest_folder}")
+            
+            # Check for color JSON files - if none exist, clear state but still allow color application
+            try:
+                color_json_files = list(latest_folder.glob("customized-groupid-color-*.json"))
+                
+                if color_json_files:
+                    print(f"[ssms_window.is_combination_in_actual_regex_files] Found {len(color_json_files)} existing color JSON files: {[f.name for f in color_json_files]}")
+                else:
+                    print(f"[ssms_window.is_combination_in_actual_regex_files] No color JSON files found yet - clearing state to allow fresh color application")
+                    # Clear state since no color files exist yet, but allow the function to proceed
+                    state.clear_tab_color_tracking()
+                
+                # Return True as long as ColorByRegexConfig.txt exists - color JSONs will be created when colors are applied
+                return True
+                    
+            except Exception as e:
+                print(f"[ssms_window.is_combination_in_actual_regex_files] Error listing directory {latest_folder}: {e}")
+                # Still return True if we can find the config file, even if we can't list the directory
+                return True
                 
         except Exception as e:
-            print(f"[ssms_window.is_combination_in_regex] Error checking combination: {e}")
+            print(f"[ssms_window.is_combination_in_actual_regex_files] Error checking color files: {e}")
             return False
         
     
@@ -167,6 +209,11 @@ class SsmsWindow:
         
         # Try to wait for loading to complete
         SsmsWindow.wait_for_query()
+        
+        # Check if the ColorByRegexConfig.txt file exists before proceeding
+        # This will also clear tab color state if the file is missing
+        SsmsWindow.is_combination_in_actual_regex_files(server, db)
+        
         # Extract temp name for unique naming
         basename = os.path.basename(temp_file).replace('..sql', '.sql')
         
