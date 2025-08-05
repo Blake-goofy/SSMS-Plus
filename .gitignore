@@ -4,8 +4,8 @@ __pycache__
 dist/
 build/
 
-# Inno Setup temporary files
-Output/
+# Executables
+*.exe
 
 # Settings (user-specific)
 settings.ini
