@@ -3,10 +3,8 @@ __pycache__
 # PyInstaller
 dist/
 build/
-*.spec
 
-# Inno Setup
-installer/
+# Inno Setup temporary files
 Output/
 
 # Settings (user-specific)

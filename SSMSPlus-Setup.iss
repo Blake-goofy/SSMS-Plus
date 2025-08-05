@@ -42,11 +42,11 @@ Source: "ssmsplus_red.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\SSMS Plus"; Filename: "{app}\SSMSPlus.exe"; IconFilename: "{app}\ssmsplus.ico"
-Name: "{autodesktop}\SSMS Plus"; Filename: "{app}\SSMSPlus.exe"; IconFilename: "{app}\ssmsplus.ico"; Tasks: desktopicon
+Name: "{autoprograms}\SSMS Plus"; Filename: "{app}\SSMSPlus.exe"
+Name: "{autodesktop}\SSMS Plus"; Filename: "{app}\SSMSPlus.exe"; Tasks: desktopicon
 Name: "{userstartup}\SSMS Plus"; Filename: "{app}\SSMSPlus.exe"; Tasks: startup
 ; Add uninstaller to programs menu
-Name: "{autoprograms}\Uninstall SSMS Plus"; Filename: "{uninstallexe}"; IconFilename: "{app}\ssmsplus.ico"
+Name: "{autoprograms}\Uninstall SSMS Plus"; Filename: "{uninstallexe}"
 
 [Run]
 Filename: "{app}\SSMSPlus.exe"; Description: "{cm:LaunchProgram,SSMS Plus}"; Flags: nowait postinstall skipifsilent
@@ -65,6 +65,7 @@ function InitializeSetup(): Boolean;
 var
   OldVersion: String;
   IsUpdate: Boolean;
+  ExitCode: Integer;
 begin
   Result := True;
   
@@ -75,7 +76,7 @@ begin
   begin
     Log('Detected existing installation: ' + OldVersion);
     // Stop the running application before update
-    Exec('taskkill', '/F /IM SSMSPlus.exe', '', SW_HIDE, ewWaitUntilTerminated, Result);
+    Exec('taskkill', '/F /IM SSMSPlus.exe', '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
   end;
   
   // Check if SSMS is installed (optional check)
@@ -92,10 +93,12 @@ begin
 end;
 
 function InitializeUninstall(): Boolean;
+var
+  ExitCode: Integer;
 begin
   Result := True;
   // Stop the application before uninstalling
-  Exec('taskkill', '/F /IM SSMSPlus.exe', '', SW_HIDE, ewWaitUntilTerminated, Result);
+  Exec('taskkill', '/F /IM SSMSPlus.exe', '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
   
   // Ask user if they want to keep settings
   if MsgBox('Do you want to keep your SSMS Plus settings and configuration?' + #13#13 + 
