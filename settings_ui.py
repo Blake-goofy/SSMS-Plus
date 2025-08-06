@@ -853,8 +853,8 @@ class SettingsWindow:
     def execute_update(self, installer_path):
         """Execute the update installer and properly close the application"""
         try:
-            # Start the installer
-            subprocess.Popen([installer_path, "/SILENT"], shell=True)
+            # Start the installer with additional parameters for auto-restart
+            subprocess.Popen([installer_path, "/SILENT", "/RESTARTEXITCODE=3010"], shell=True)
             
             # Properly shutdown the application
             # First close the settings window
@@ -863,8 +863,31 @@ class SettingsWindow:
             # Then trigger application exit through the main app
             # This allows proper cleanup of resources
             if hasattr(state, 'current_tray_app') and state.current_tray_app:
-                # Use the tray app's exit method for proper cleanup
-                state.current_tray_app.root.after(100, state.current_tray_app.root.quit)
+                # Force quit the tray app properly
+                try:
+                    # Stop any watchers first
+                    if hasattr(state, 'current_watcher_observer') and state.current_watcher_observer:
+                        state.current_watcher_observer.stop()
+                        state.current_watcher_observer = None
+                    
+                    # Quit the tray app's main loop
+                    state.current_tray_app.icon.stop()
+                    
+                    # Schedule immediate exit
+                    import threading
+                    def force_exit():
+                        import time
+                        time.sleep(0.5)  # Give time for cleanup
+                        import os
+                        os._exit(0)
+                    
+                    threading.Thread(target=force_exit, daemon=True).start()
+                    
+                except Exception as e:
+                    print(f"Error during tray app shutdown: {e}")
+                    # Fallback to direct exit
+                    import os
+                    os._exit(0)
             else:
                 # Fallback to direct exit
                 import os
