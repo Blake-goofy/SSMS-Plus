@@ -225,16 +225,48 @@ class SsmsWindow:
         target_path = target_path.replace('/', '\\')
         print(f"[ssms_window.save_temp_file] Target path: {target_path}")
         
-        FileManager.create_save_dir(os.path.dirname(target_path))
-        SsmsWindow.automate_save_as(target_path)
-        write_to_regex_file(server, db)
-        # Apply tab coloring if enabled
-        SsmsWindow.apply_tab_color(server, db)
+        # Handle clipboard backup and set target path as early as possible
+        original_clipboard = None
+        try:
+            original_clipboard = pyperclip.paste()
+            print(f"[ssms_window.save_temp_file] Original clipboard backed up")
+        except Exception as e:
+            print(f"[ssms_window.save_temp_file] Could not backup clipboard: {e}")
+            
+        try:
+            pyperclip.copy(target_path)
+            print(f"[ssms_window.save_temp_file] Clipboard set to target path: {target_path}")
+            
+            # Verify clipboard was set correctly
+            early_verify = pyperclip.paste()
+            if early_verify == target_path:
+                print(f"[ssms_window.save_temp_file] Early clipboard verification PASSED")
+            else:
+                print(f"[ssms_window.save_temp_file] Early clipboard verification FAILED")
+                print(f"  Expected: {repr(target_path)}")
+                print(f"  Actual:   {repr(early_verify)}")
+        except Exception as e:
+            print(f"[ssms_window.save_temp_file] Error setting clipboard: {e}")
+        
+        try:
+            FileManager.create_save_dir(os.path.dirname(target_path))
+            SsmsWindow.automate_save_as(target_path, original_clipboard)
+            write_to_regex_file(server, db)
+            # Apply tab coloring if enabled
+            SsmsWindow.apply_tab_color(server, db)
+        finally:
+            # Always restore original clipboard content
+            if original_clipboard is not None:
+                try:
+                    pyperclip.copy(original_clipboard)
+                    print(f"[ssms_window.save_temp_file] Clipboard restored to original content")
+                except Exception as e:
+                    print(f"[ssms_window.save_temp_file] Failed to restore clipboard: {e}")
 
         return target_path
 
     @staticmethod
-    def automate_save_as(target_path):
+    def automate_save_as(target_path, original_clipboard=None):
         """Automate the Save As dialog process"""
         
         # Speed up pyautogui by reducing delays
@@ -242,12 +274,20 @@ class SsmsWindow:
         pyautogui.PAUSE = 0.01  # Reduce from default 0.1 to 0.01
         
         try:
-            # Save the current clipboard content
-            original_clipboard = None
+            # Clipboard is already set by save_temp_file, just verify it's still correct
             try:
-                original_clipboard = pyperclip.paste()
-            except Exception:
-                pass  # If clipboard is empty or inaccessible, continue
+                current_clipboard = pyperclip.paste()
+                if current_clipboard == target_path:
+                    print(f"[ssms_window.automate_save_as] Clipboard verification PASSED: {current_clipboard}")
+                else:
+                    print(f"[ssms_window.automate_save_as] Clipboard verification FAILED, re-setting")
+                    print(f"  Expected: {repr(target_path)}")
+                    print(f"  Actual:   {repr(current_clipboard)}")
+                    pyperclip.copy(target_path)
+            except Exception as e:
+                print(f"[ssms_window.automate_save_as] Clipboard verification error: {e}")
+                # Try to set it again
+                pyperclip.copy(target_path)
             
             VK_CTRL = 0x11
             VK_N = 0x4E
@@ -270,10 +310,8 @@ class SsmsWindow:
                 if not wait_until_keys_released():
                     return False
                 
-                pyperclip.copy(target_path)
-                
                 # Additional debugging - let's check multiple ways
-                print(f"[ssms_window.perform_save_attempt] Attempting to set clipboard to: {target_path}")
+                print(f"[ssms_window.perform_save_attempt] Using clipboard content for: {target_path}")
                 
                 # Verify clipboard was updated (with timeout)
                 clipboard_timeout = time.time() + 1.0  # 1 second timeout
@@ -310,8 +348,8 @@ class SsmsWindow:
                         if target_path.strip() == final_clipboard.strip():
                             print(f"[ssms_window.perform_save_attempt] NOTE: Strings match when stripped - whitespace issue!")
                         
-                        # Try setting clipboard again with a small delay
-                        print(f"[ssms_window.perform_save_attempt] Trying clipboard set again...")
+                        # Try setting clipboard again with a small delay (as fallback)
+                        print(f"[ssms_window.perform_save_attempt] Trying clipboard set again as fallback...")
                         time.sleep(0.1)
                         pyperclip.copy(target_path)
                         time.sleep(0.1)
@@ -334,11 +372,7 @@ class SsmsWindow:
                     if w and w.title.strip().startswith("Save File As"):
                         print("[ssms_window.perform_save_attempt] Save As dialog appeared")
                         
-                        # Set clipboard again right before pasting to ensure it's correct
-                        pyperclip.copy(target_path)
-                        time.sleep(0.05)  # Small delay to ensure clipboard is set
-                        
-                        # Verify clipboard one more time before pasting
+                        # Verify clipboard still contains correct path before pasting
                         verify_clipboard = pyperclip.paste()
                         if verify_clipboard == target_path:
                             print(f"[ssms_window.perform_save_attempt] Pre-paste clipboard verification PASSED")
@@ -346,7 +380,11 @@ class SsmsWindow:
                             print(f"[ssms_window.perform_save_attempt] Pre-paste clipboard verification FAILED")
                             print(f"  Expected: {repr(target_path)}")
                             print(f"  Actual:   {repr(verify_clipboard)}")
-                        
+                            # Re-set clipboard if verification failed
+                            pyperclip.copy(target_path)
+                            time.sleep(0.1)  # Small delay to ensure clipboard is set
+
+                        time.sleep(0.1)
                         pyautogui.hotkey('ctrl', 'v')
                         pyautogui.press('enter')
                         return True
@@ -392,13 +430,6 @@ class SsmsWindow:
                 # Second attempt - don't check result, just proceed
                 perform_save_attempt()
                 print(f"[ssms_window.automate_save_as] Second attempt completed")
-            
-            # Restore clipboard
-            if original_clipboard is not None:
-                try:
-                    pyperclip.copy(original_clipboard)
-                except Exception:
-                    pass
                     
         finally:
             # Always restore original pause setting

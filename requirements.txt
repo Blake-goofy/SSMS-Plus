@@ -7,3 +7,4 @@ pyautogui
 pyperclip
 configparser
 requests
+pyinstaller
