@@ -1,8 +1,8 @@
 [Setup]
 AppId={{B8F5E6D2-8C4A-4B5E-9F3A-1D7C8E9B2A4F}
 AppName=SSMS Plus
-AppVersion=1.1.3
-AppVerName=SSMS Plus 1.1.3
+AppVersion=1.1.4
+AppVerName=SSMS Plus 1.1.4
 AppPublisher=Blake-goofy
 AppPublisherURL=https://github.com/Blake-goofy/ssmsplus
 AppSupportURL=https://github.com/Blake-goofy/ssmsplus/issues
@@ -19,7 +19,7 @@ SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\SSMSPlus.exe
 ; Update-related settings
-VersionInfoVersion=1.1.3.0
+VersionInfoVersion=1.1.4.0
 VersionInfoCompany=Blake-goofy
 VersionInfoDescription=SSMS Plus - Enhanced SQL Server Management Studio Experience
 VersionInfoCopyright=Copyright (C) 2025 Blake-goofy
@@ -108,18 +108,6 @@ begin
       end;
     end;
   end;
-  
-  // Check if SSMS is installed (optional check)
-  if not RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Microsoft SQL Server\150\Tools\ClientSetup') and
-     not RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Microsoft SQL Server\160\Tools\ClientSetup') and
-     not RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Microsoft SQL Server\170\Tools\ClientSetup') then
-  begin
-    if MsgBox('SQL Server Management Studio (SSMS) was not detected on this system. SSMS Plus requires SSMS to function properly.' + #13#13 + 
-              'Do you want to continue with the installation?', mbConfirmation, MB_YESNO) = IDNO then
-    begin
-      Result := False;
-    end;
-  end;
 end;
 
 function InitializeUninstall(): Boolean;
@@ -153,25 +141,9 @@ begin
     
     if IsUpdate then
     begin
-      // Show update success message
-      MsgBox('SSMS Plus has been updated successfully!' + #13#13 + 
-             'Updated from version ' + OldVersion + ' to 1.1.3' + #13#13 +
-             'The application will start automatically.', 
-             mbInformation, MB_OK);
-             
-      // Auto-start the application after update
+      // Auto-start the application after update (no message box)
       Exec(ExpandConstant('{app}\SSMSPlus.exe'), '', '', SW_SHOW, ewNoWait, ResultCode);
-    end
-    else
-    begin
-      // Show first-time installation message
-      MsgBox('SSMS Plus has been installed successfully!' + #13#13 + 
-             'To get started:' + #13 +
-             '1. Look for SSMS Plus in your system tray (bottom-right corner)' + #13 +
-             '2. Left-click the icon to configure your directories' + #13 +
-             '3. Enable "Color tabs by regular expression" in SSMS Options' + #13#13 +
-             'For detailed setup instructions, see the README file in the installation folder.', 
-             mbInformation, MB_OK);
     end;
+    // No message boxes for first-time installation either
   end;
 end;

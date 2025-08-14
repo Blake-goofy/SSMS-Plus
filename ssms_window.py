@@ -210,10 +210,11 @@ class SsmsWindow:
         # Extract temp name for unique naming
         basename = os.path.basename(temp_file).replace('..sql', '.sql')
         
-        custom_filename = f"{server}_{db}_{basename}"
+        # Convert server and db to uppercase for filename, leave basename as-is
+        custom_filename = f"{server.upper()}_{db.upper()}_{basename}"
         print(f"[ssms_window.save_temp_file] Using filename: {custom_filename}")
         
-        # Create the target path and save
+        # Create the target path and save (use original case for directory structure)
         target_path = os.path.join(save_dir, server, db, 'temp', custom_filename)
         target_path = target_path.replace('/', '\\')
         print(f"[ssms_window.save_temp_file] Target path: {target_path}")
