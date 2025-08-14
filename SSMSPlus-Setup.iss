@@ -1,8 +1,8 @@
 [Setup]
 AppId={{B8F5E6D2-8C4A-4B5E-9F3A-1D7C8E9B2A4F}
 AppName=SSMS Plus
-AppVersion=1.1.4
-AppVerName=SSMS Plus 1.1.4
+AppVersion=1.1.5
+AppVerName=SSMS Plus 1.1.5
 AppPublisher=Blake-goofy
 AppPublisherURL=https://github.com/Blake-goofy/ssmsplus
 AppSupportURL=https://github.com/Blake-goofy/ssmsplus/issues
@@ -19,7 +19,7 @@ SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\SSMSPlus.exe
 ; Update-related settings
-VersionInfoVersion=1.1.4.0
+VersionInfoVersion=1.1.5.0
 VersionInfoCompany=Blake-goofy
 VersionInfoDescription=SSMS Plus - Enhanced SQL Server Management Studio Experience
 VersionInfoCopyright=Copyright (C) 2025 Blake-goofy
@@ -27,6 +27,7 @@ VersionInfoCopyright=Copyright (C) 2025 Blake-goofy
 AllowNoIcons=yes
 CreateUninstallRegKey=yes
 UninstallDisplayName=SSMS Plus
+DisableFinishedPage=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -49,7 +50,8 @@ Name: "{userstartup}\SSMS Plus"; Filename: "{app}\SSMSPlus.exe"; Tasks: startup
 Name: "{autoprograms}\Uninstall SSMS Plus"; Filename: "{uninstallexe}"
 
 [Run]
-Filename: "{app}\SSMSPlus.exe"; Description: "{cm:LaunchProgram,SSMS Plus}"; Flags: nowait postinstall skipifsilent
+; Always show launch checkbox - checked by default for convenience
+Filename: "{app}\SSMSPlus.exe"; Description: "{cm:LaunchProgram,SSMS Plus}"; Flags: nowait postinstall
 
 [UninstallRun]
 ; Stop the application before uninstalling
@@ -61,53 +63,28 @@ Filename: "{cmd}"; Parameters: "/C taskkill /F /IM SSMSPlus.exe"; Flags: runhidd
 ; Type: dirifempty; Name: "{userappdata}\SSMSPlus"
 
 [Code]
+function BoolToStr(Value: Boolean): String;
+begin
+  if Value then
+    Result := 'True'
+  else
+    Result := 'False';
+end;
+
 function InitializeSetup(): Boolean;
 var
-  OldVersion: String;
-  IsUpdate: Boolean;
   ExitCode: Integer;
-  RetryCount: Integer;
 begin
   Result := True;
   
-  // Check if this is an update installation
-  IsUpdate := RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B8F5E6D2-8C4A-4B5E-9F3A-1D7C8E9B2A4F}_is1', 'DisplayVersion', OldVersion);
+  // Always try to stop any running SSMS Plus process before installation
+  // This works for both fresh installs and updates
+  Log('InitializeSetup: Attempting to terminate any running SSMSPlus processes');
+  Exec('taskkill', '/F /IM SSMSPlus.exe', '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+  Log('InitializeSetup: taskkill result = ' + IntToStr(ExitCode));
   
-  if IsUpdate then
-  begin
-    Log('Detected existing installation: ' + OldVersion);
-    // Try to stop the running application before update (with retries)
-    RetryCount := 0;
-    while (RetryCount < 5) do
-    begin
-      // First try gentle termination
-      if RetryCount = 0 then
-        Exec('taskkill', '/IM SSMSPlus.exe', '', SW_HIDE, ewWaitUntilTerminated, ExitCode)
-      else
-        // Then use force
-        Exec('taskkill', '/F /IM SSMSPlus.exe', '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
-      
-      Sleep(2000); // Wait 2 seconds between attempts
-      
-      // Check if process is still running
-      if not Exec('tasklist', '/FI "IMAGENAME eq SSMSPlus.exe" | find /I "SSMSPlus.exe"', '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
-        break; // Process not found, we're good
-        
-      RetryCount := RetryCount + 1;
-    end;
-    
-    // If we still can't close it after retries, warn the user
-    if RetryCount >= 5 then
-    begin
-      if MsgBox('SSMS Plus is still running and needs to be closed for the update to proceed.' + #13#13 + 
-                'Please close SSMS Plus manually and click "Retry", or click "Cancel" to abort the installation.', 
-                mbError, MB_RETRYCANCEL) = IDCANCEL then
-      begin
-        Result := False;
-        Exit;
-      end;
-    end;
-  end;
+  // Give a moment for the process to fully terminate
+  Sleep(1000);
 end;
 
 function InitializeUninstall(): Boolean;
@@ -131,19 +108,11 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  IsUpdate: Boolean;
-  OldVersion: String;
-  ResultCode: Integer;
+  ExitCode: Integer;
 begin
-  if CurStep = ssPostInstall then
-  begin
-    IsUpdate := RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B8F5E6D2-8C4A-4B5E-9F3A-1D7C8E9B2A4F}_is1', 'DisplayVersion', OldVersion);
-    
-    if IsUpdate then
-    begin
-      // Auto-start the application after update (no message box)
-      Exec(ExpandConstant('{app}\SSMSPlus.exe'), '', '', SW_SHOW, ewNoWait, ResultCode);
-    end;
-    // No message boxes for first-time installation either
-  end;
+  // Simple logging only - let the [Run] section handle launching
+  Log('CurStepChanged: CurStep = ' + IntToStr(Ord(CurStep)));
+  
+  if CurStep = ssDone then
+    Log('CurStepChanged: Installation complete');
 end;

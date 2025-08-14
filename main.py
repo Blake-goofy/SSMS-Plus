@@ -7,6 +7,7 @@ from file_manager import FileManager
 import threading
 from watcher import on_new_sql
 import os
+import sys
 
 def start_watcher_in_thread(temp_dir):
     # Stop existing watcher if it exists

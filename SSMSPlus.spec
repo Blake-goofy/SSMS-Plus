@@ -1,15 +1,22 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
+import os
 
+# Get the base Python installation directory (not the venv)
+python_dir = sys.base_exec_prefix
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=[
+        # Explicitly include Python DLL from system Python installation
+        (os.path.join(python_dir, 'python313.dll'), '.'),
+    ],
     datas=[
         ('ssmsplus_yellow.ico', '.'),
         ('ssmsplus_red.ico', '.'),
     ],
-    hiddenimports=['requests'],
+    hiddenimports=['requests', 'pystray', 'PIL', 'PIL.Image'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
