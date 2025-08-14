@@ -853,9 +853,26 @@ class SettingsWindow:
     def execute_update(self, installer_path):
         """Execute the update installer and properly close the application"""
         try:
-            # Start the installer with additional parameters for auto-restart
-            subprocess.Popen([installer_path, "/SILENT", "/RESTARTEXITCODE=3010"], shell=True)
+            # Sanitize environment to prevent PyInstaller inheritance issues
+            env = os.environ.copy()
+            # Tell the spawned processes to reset the PyInstaller environment
+            env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+            # Remove old PyInstaller variables if present
+            env.pop("_MEIPASS2", None)
+            env.pop("_PYI_APPLICATION_HOME_DIR", None)
             
+            print(f"Starting installer: {installer_path}")
+            print(f"Environment variables set: PYINSTALLER_RESET_ENVIRONMENT=1")
+            
+            # Start the installer with visible UI - no shell=True to avoid issues
+            process = subprocess.Popen([installer_path], env=env)
+            print(f"Installer process started with PID: {process.pid}")
+            
+            # Give the installer a moment to start
+            import time
+            time.sleep(2)
+            
+            print("Shutting down application...")
             # Properly shutdown the application
             # First close the settings window
             self.root.destroy()
@@ -865,11 +882,13 @@ class SettingsWindow:
             if hasattr(state, 'current_tray_app') and state.current_tray_app:
                 # Force quit the tray app properly
                 try:
+                    print("Stopping watchers...")
                     # Stop any watchers first
                     if hasattr(state, 'current_watcher_observer') and state.current_watcher_observer:
                         state.current_watcher_observer.stop()
                         state.current_watcher_observer = None
                     
+                    print("Stopping tray icon...")
                     # Quit the tray app's main loop
                     state.current_tray_app.icon.stop()
                     
@@ -877,8 +896,8 @@ class SettingsWindow:
                     import threading
                     def force_exit():
                         import time
-                        time.sleep(0.5)  # Give time for cleanup
-                        import os
+                        time.sleep(1)  # Give more time for cleanup
+                        print("Force exiting application...")
                         os._exit(0)
                     
                     threading.Thread(target=force_exit, daemon=True).start()
@@ -886,11 +905,10 @@ class SettingsWindow:
                 except Exception as e:
                     print(f"Error during tray app shutdown: {e}")
                     # Fallback to direct exit
-                    import os
                     os._exit(0)
             else:
+                print("No tray app found, direct exit...")
                 # Fallback to direct exit
-                import os
                 os._exit(0)
                 
         except Exception as e:
