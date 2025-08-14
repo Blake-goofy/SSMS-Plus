@@ -1,8 +1,8 @@
 [Setup]
 AppId={{B8F5E6D2-8C4A-4B5E-9F3A-1D7C8E9B2A4F}
 AppName=SSMS Plus
-AppVersion=1.1.2
-AppVerName=SSMS Plus 1.1.2
+AppVersion=1.1.3
+AppVerName=SSMS Plus 1.1.3
 AppPublisher=Blake-goofy
 AppPublisherURL=https://github.com/Blake-goofy/ssmsplus
 AppSupportURL=https://github.com/Blake-goofy/ssmsplus/issues
@@ -19,7 +19,7 @@ SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\SSMSPlus.exe
 ; Update-related settings
-VersionInfoVersion=1.1.2.0
+VersionInfoVersion=1.1.3.0
 VersionInfoCompany=Blake-goofy
 VersionInfoDescription=SSMS Plus - Enhanced SQL Server Management Studio Experience
 VersionInfoCopyright=Copyright (C) 2025 Blake-goofy
@@ -155,7 +155,7 @@ begin
     begin
       // Show update success message
       MsgBox('SSMS Plus has been updated successfully!' + #13#13 + 
-             'Updated from version ' + OldVersion + ' to 1.1.2' + #13#13 +
+             'Updated from version ' + OldVersion + ' to 1.1.3' + #13#13 +
              'The application will start automatically.', 
              mbInformation, MB_OK);
              
