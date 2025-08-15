@@ -52,7 +52,10 @@ def parse_server_db_from_title(title):
     # Looks for the first "SOME_SERVER.SOME_DB (" pattern
     m = re.search(r'([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+) \(', title)
     if m:
-        return m.group(1), m.group(2)
+        # Always return server and database names in uppercase to handle caps lock issues
+        # When caps lock is on, users type server/db names in lowercase, but we want
+        # consistent uppercase naming for filenames and display throughout the system
+        return m.group(1).upper(), m.group(2).upper()
     return None, None
 
 def get_server_db(timeout=1.5, poll_interval=0.1):

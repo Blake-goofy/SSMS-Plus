@@ -4,7 +4,6 @@ pystray
 Pillow
 pygetwindow
 pyautogui
-pyperclip
 configparser
 requests
 pyinstaller

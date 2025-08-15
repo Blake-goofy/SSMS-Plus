@@ -1,6 +1,5 @@
 """SSMS window parsing/interacting functions."""
 import pyautogui
-import pyperclip
 import ctypes
 import pygetwindow
 import os
@@ -10,6 +9,35 @@ from regex_writer import write_to_regex_file
 from state import settings, state
 
 class SsmsWindow:
+    
+    @staticmethod
+    def is_caps_lock_on():
+        """Check if Caps Lock is currently enabled"""
+        # GetKeyState for VK_CAPITAL (0x14) returns 1 if Caps Lock is on, 0 if off
+        VK_CAPITAL = 0x14
+        return ctypes.windll.user32.GetKeyState(VK_CAPITAL) & 1 == 1
+    
+    @staticmethod
+    def write_text_handling_caps_lock(text):
+        """Write text properly regardless of caps lock state"""
+        caps_lock_is_on = SsmsWindow.is_caps_lock_on()
+        
+        if caps_lock_is_on:
+            # If caps lock is on, we need to invert the case of letters
+            # since caps lock will invert them again
+            inverted_text = ""
+            for char in text:
+                if char.isupper():
+                    inverted_text += char.lower()
+                elif char.islower():
+                    inverted_text += char.upper()
+                else:
+                    inverted_text += char
+            print(f"[ssms_window.write_text_handling_caps_lock] Caps Lock ON - inverting text: '{text}' -> '{inverted_text}'")
+            pyautogui.write(inverted_text, interval=0)
+        else:
+            print(f"[ssms_window.write_text_handling_caps_lock] Caps Lock OFF - writing text normally: '{text}'")
+            pyautogui.write(text, interval=0)
     
     @staticmethod
     def wait_for_query(timeout=10):
@@ -219,14 +247,6 @@ class SsmsWindow:
         target_path = target_path.replace('/', '\\')
         print(f"[ssms_window.save_temp_file] Target path: {target_path}")
         
-        # Handle clipboard backup - store it immediately since we want to restore it later
-        original_clipboard = None
-        try:
-            original_clipboard = pyperclip.paste()
-            print(f"[ssms_window.save_temp_file] Original clipboard backed up")
-        except Exception as e:
-            print(f"[ssms_window.save_temp_file] Could not backup clipboard: {e}")
-        
         # Try to wait for loading to complete before proceeding
         print(f"[ssms_window.save_temp_file] Waiting for any loading screens to complete...")
         SsmsWindow.wait_for_query()
@@ -235,33 +255,24 @@ class SsmsWindow:
         # This will also clear tab color state if the file is missing
         SsmsWindow.is_combination_in_actual_regex_files(server, db)
         
-        try:
-            FileManager.create_save_dir(os.path.dirname(target_path))
-            SsmsWindow.automate_save_as(target_path, original_clipboard)
-            write_to_regex_file(server, db)
-            # Apply tab coloring if enabled
-            SsmsWindow.apply_tab_color(server, db)
-        finally:
-            # Always restore original clipboard content
-            if original_clipboard is not None:
-                try:
-                    pyperclip.copy(original_clipboard)
-                    print(f"[ssms_window.save_temp_file] Clipboard restored to original content")
-                except Exception as e:
-                    print(f"[ssms_window.save_temp_file] Failed to restore clipboard: {e}")
+        FileManager.create_save_dir(os.path.dirname(target_path))
+        SsmsWindow.automate_save_as(target_path)
+        write_to_regex_file(server, db)
+        # Apply tab coloring if enabled
+        SsmsWindow.apply_tab_color(server, db)
 
         return target_path
 
     @staticmethod
-    def automate_save_as(target_path, original_clipboard=None):
-        """Automate the Save As dialog process using direct typing for reliability"""
+    def automate_save_as(target_path):
+        """Automate the Save As dialog process using caps lock-aware typing"""
         
         # Speed up pyautogui by reducing delays
         original_pause = pyautogui.PAUSE
         pyautogui.PAUSE = 0.001  # Reduce from default 0.1 to 0.001
 
         try:
-            print(f"[ssms_window.automate_save_as] Will type filename directly: {target_path}")
+            print(f"[ssms_window.automate_save_as] Will type filename with caps lock detection: {target_path}")
             
             VK_CTRL = 0x11
             VK_N = 0x4E
@@ -280,11 +291,11 @@ class SsmsWindow:
                 return False
             
             def perform_save_attempt():
-                """Perform a single save attempt using direct typing"""
+                """Perform a single save attempt using caps lock-aware typing"""
                 if not wait_until_keys_released():
                     return False
                 
-                print(f"[ssms_window.perform_save_attempt] Performing save attempt by typing: {target_path}")
+                print(f"[ssms_window.perform_save_attempt] Performing save attempt with caps lock handling: {target_path}")
                 
                 # must use keyDown/press/keyUp to avoid issues with modifier keys
                 pyautogui.keyDown('ctrl')
@@ -299,10 +310,10 @@ class SsmsWindow:
                     if w and w.title.strip().startswith("Save File As"):
                         print("[ssms_window.perform_save_attempt] Save As dialog appeared")
                         
-                        # ALWAYS TYPE DIRECTLY - More reliable than clipboard
-                        print(f"[ssms_window.perform_save_attempt] Typing filename directly for reliability: {target_path}")
+                        # Use caps lock-aware typing
+                        print(f"[ssms_window.perform_save_attempt] Typing filename with caps lock detection: {target_path}")
                         
-                        pyautogui.write(target_path, interval=0)
+                        SsmsWindow.write_text_handling_caps_lock(target_path)
                         
                         pyautogui.press('enter')
                         return True
